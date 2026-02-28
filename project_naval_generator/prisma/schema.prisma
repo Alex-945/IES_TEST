@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Stage {
+  PLANNING
+  BIBLE
+  OUTLINE
+  CHAPTER_PLAN
+  DRAFT
+  QA
+  EXPORT
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  stage       Stage    @default(PLANNING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  planningSnapshots PlanningSnapshot[]
+  bibleVersions     BibleVersion[]
+  outlineVersions   OutlineVersion[]
+  chapterPlanVersions ChapterPlanVersion[]
+  chapterDrafts     ChapterDraft[]
+  chapterSummaries  ChapterSummary[]
+  qaReports         QAReport[]
+  experimentRuns    ExperimentRun[]
+  exportRecords     ExportRecord[]
+  generationLogs    GenerationLog[]
+}
+
+model PlanningSnapshot {
+  id        String   @id @default(cuid())
+  projectId String
+  version   Int
+  json      Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId])
+}
+
+model BibleVersion {
+  id        String   @id @default(cuid())
+  projectId String
+  version   Int
+  json      Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId])
+}
+
+model OutlineVersion {
+  id        String   @id @default(cuid())
+  projectId String
+  version   Int
+  json      Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId])
+}
+
+model ChapterPlanVersion {
+  id        String   @id @default(cuid())
+  projectId String
+  version   Int
+  json      Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId])
+}
+
+model ChapterDraft {
+  id         String   @id @default(cuid())
+  projectId  String
+  chapterNo  Int
+  version    Int
+  text       String
+  params     Json?
+  promptHash String?
+  refs       Json?
+  createdAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, chapterNo, version])
+  @@index([projectId, chapterNo])
+}
+
+model ChapterSummary {
+  id        String   @id @default(cuid())
+  projectId String
+  chapterNo Int
+  version   Int
+  summary   String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, chapterNo, version])
+  @@index([projectId, chapterNo])
+}
+
+model QAReport {
+  id           String   @id @default(cuid())
+  projectId    String
+  chapterNo    Int
+  draftVersion Int?
+  json         Json
+  scores       Json?
+  createdAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, chapterNo])
+}
+
+model ExperimentRun {
+  id        String   @id @default(cuid())
+  projectId String
+  title     String
+  rounds    Int
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  results ExperimentResult[]
+
+  @@index([projectId])
+}
+
+model ExperimentResult {
+  id          String   @id @default(cuid())
+  runId       String
+  chapterNo   Int
+  variantName String
+  draftText   String
+  qaJson      Json?
+  createdAt   DateTime @default(now())
+
+  run ExperimentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+model ExportRecord {
+  id        String   @id @default(cuid())
+  projectId String
+  type      String
+  path      String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model GenerationLog {
+  id         String   @id @default(cuid())
+  projectId  String
+  task       String
+  promptHash String
+  model      String
+  params     Json?
+  refs       Json?
+  createdAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, task])
+}

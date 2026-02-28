@@ -1,0 +1,105 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novel Workbench Lite</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="card header">
+      <div>
+        <h1>Novel Workbench Lite</h1>
+        <p>純前端本機版（不需 Node.js）</p>
+      </div>
+      <div class="header-actions">
+        <button id="pickFolderBtn" class="btn">選擇 data 資料夾</button>
+        <button id="exportBtn" class="btn secondary">匯出專案 JSON</button>
+        <button id="importBtn" class="btn secondary">匯入專案 JSON</button>
+        <input id="importFile" type="file" accept="application/json" hidden />
+      </div>
+    </header>
+
+    <section class="card api-panel">
+      <h2>API 接入區</h2>
+      <div class="api-grid">
+        <label>
+          Base URL
+          <input id="apiBaseUrl" placeholder="https://api.deepseek.com" />
+        </label>
+        <label>
+          Model
+          <input id="apiModel" placeholder="deepseek-chat" />
+        </label>
+        <label>
+          API Key
+          <input id="apiKey" type="password" placeholder="sk-..." />
+        </label>
+      </div>
+      <div class="actions">
+        <button id="saveApiBtn" class="btn">儲存 API 設定</button>
+        <button id="testApiBtn" class="btn secondary">測試連線</button>
+        <span id="apiStatus" class="tag">尚未測試</span>
+      </div>
+    </section>
+
+    <section class="card row">
+      <div class="left">
+        <h2>Projects</h2>
+        <div class="new-project">
+          <input id="projectName" placeholder="新專案名稱" />
+          <button id="createProjectBtn" class="btn">新增</button>
+        </div>
+        <ul id="projectList" class="list"></ul>
+      </div>
+      <div class="right" id="workspace">
+        <div class="empty">先建立或選擇一個專案</div>
+      </div>
+    </section>
+  </div>
+
+  <template id="workspaceTpl">
+    <div class="workspace-head">
+      <h2 id="wProjectTitle"></h2>
+      <span id="folderStatus" class="tag">未綁定資料夾</span>
+    </div>
+
+    <nav id="stageNav" class="stage-nav"></nav>
+
+    <div class="grid">
+      <article class="card panel">
+        <h3>現有資料摘要</h3>
+        <pre id="summaryBox"></pre>
+      </article>
+
+      <article class="card panel">
+        <h3>Gap List</h3>
+        <ul id="gapList"></ul>
+      </article>
+
+      <article class="card panel full">
+        <h3>編輯式追問（最多 3 題）</h3>
+        <div id="questionList"></div>
+      </article>
+
+      <article class="card panel full">
+        <h3>工作區</h3>
+        <div id="editorForm"></div>
+        <div class="actions">
+          <button id="saveStageBtn" class="btn">儲存版本</button>
+          <button id="nextStageBtn" class="btn secondary">前進下一階段</button>
+          <button id="runQaBtn" class="btn secondary">產生 QA 建議</button>
+        </div>
+      </article>
+
+      <article class="card panel full">
+        <h3>版本歷史</h3>
+        <ul id="historyList" class="history"></ul>
+      </article>
+    </div>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+</html>

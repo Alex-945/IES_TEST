@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, #f2fbff, #f8f5f0 45%, #fff 100%);
+  color: #102a43;
+}
+
+textarea {
+  min-height: 120px;
+}
+
+.card {
+  @apply rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm;
+}
+
+.btn {
+  @apply rounded-lg bg-accent px-3 py-2 text-white hover:opacity-90;
+}
+
+.btn-secondary {
+  @apply rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-100;
+}
