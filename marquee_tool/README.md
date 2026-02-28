@@ -10,3 +10,4 @@
 - GIF export uses gif.js from CDN.
 - Transparent GIF works via chroma-key mapping.
 - For best compatibility, run with local server instead of `file://`.
+- In Chromium browsers on `http://localhost` or `https`, download buttons open a save dialog so you can choose folder/file name.

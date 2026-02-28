@@ -183,7 +183,7 @@ async function exportWebM() {
   await recordPromise;
 
   const blob = new Blob(chunks, { type: mimeType });
-  downloadBlob(blob, `marquee_${Date.now()}.webm`);
+  return saveBlob(blob, `marquee_${Date.now()}.webm`, "video/webm");
 }
 
 async function exportGif() {
@@ -235,13 +235,43 @@ async function exportGif() {
     gif.render();
   });
 
-  downloadBlob(blob, `marquee_${Date.now()}.gif`);
+  return saveBlob(blob, `marquee_${Date.now()}.gif`, "image/gif");
 }
 
 function pickChromaKey(textColor) {
   const keys = ["#00ff00", "#ff00ff", "#00ffff", "#ffff00"];
   const normalized = String(textColor || "").toLowerCase();
   return keys.find((k) => k !== normalized) || "#00ff00";
+}
+
+async function saveBlob(blob, fileName, mimeType) {
+  const canUsePicker = typeof window.showSaveFilePicker === "function" && window.isSecureContext;
+  if (!canUsePicker) {
+    downloadBlob(blob, fileName);
+    return "download";
+  }
+
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: fileName,
+      types: [
+        {
+          description: mimeType,
+          accept: { [mimeType]: [fileName.endsWith(".gif") ? ".gif" : ".webm"] }
+        }
+      ]
+    });
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return "picker";
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      throw new Error("已取消儲存");
+    }
+    downloadBlob(blob, fileName);
+    return "download";
+  }
 }
 
 function downloadBlob(blob, fileName) {
@@ -274,16 +304,16 @@ function attachEvents() {
 
   el.downloadWebm.addEventListener("click", () => withButtonsDisabled(async () => {
     setStatus("正在輸出 WebM...");
-    await exportWebM();
-    setStatus("WebM 已下載");
+    const mode = await exportWebM();
+    setStatus(mode === "picker" ? "WebM 已儲存" : "WebM 已下載");
   }).catch((err) => {
     setStatus(err.message || "WebM 匯出失敗");
   }));
 
   el.downloadGif.addEventListener("click", () => withButtonsDisabled(async () => {
     setStatus("正在輸出 GIF...");
-    await exportGif();
-    setStatus("GIF 已下載");
+    const mode = await exportGif();
+    setStatus(mode === "picker" ? "GIF 已儲存" : "GIF 已下載");
   }).catch((err) => {
     setStatus(err.message || "GIF 匯出失敗");
   }));
