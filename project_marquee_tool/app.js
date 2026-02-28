@@ -134,6 +134,14 @@ function setStatus(msg) {
   el.status.textContent = msg;
 }
 
+function normalizeErrorMessage(err, formatLabel) {
+  const raw = err && err.message ? String(err.message) : String(err || "");
+  if (raw.includes("Failed to construct 'Worker'") || raw.includes("cannot be accessed from origin 'null'")) {
+    return `${formatLabel} 需要本機伺服器模式。請雙擊 start-local.bat 後再重試。`;
+  }
+  return raw || `${formatLabel} 匯出失敗`;
+}
+
 function withButtonsDisabled(run) {
   el.downloadGif.disabled = true;
   el.downloadWebm.disabled = true;
@@ -321,7 +329,7 @@ function attachEvents() {
     const mode = await exportWebM();
     setStatus(mode === "picker" ? "WebM 已儲存" : "WebM 已下載");
   }).catch((err) => {
-    setStatus(err.message || "WebM 匯出失敗");
+    setStatus(normalizeErrorMessage(err, "WebM"));
   }));
 
   el.downloadGif.addEventListener("click", () => withButtonsDisabled(async () => {
@@ -329,7 +337,7 @@ function attachEvents() {
     const mode = await exportGif();
     setStatus(mode === "picker" ? "GIF 已儲存" : "GIF 已下載");
   }).catch((err) => {
-    setStatus(err.message || "GIF 匯出失敗");
+    setStatus(normalizeErrorMessage(err, "GIF"));
   }));
 }
 

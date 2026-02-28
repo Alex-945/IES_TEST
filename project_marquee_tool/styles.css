@@ -1,10 +1,10 @@
 ﻿:root {
-  --bg: #111213;
-  --panel: #1b1e20;
-  --line: #30363d;
-  --text: #f5f7fa;
-  --muted: #9ba3af;
-  --accent: #2d9cdb;
+  --bg: #eef4f8;
+  --panel: #ffffffcc;
+  --line: #c8d7e4;
+  --text: #1f3448;
+  --muted: #5f7286;
+  --accent: #3e92cc;
 }
 
 * { box-sizing: border-box; }
@@ -14,8 +14,8 @@ body {
   font-family: "Segoe UI", "Noto Sans TC", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at 10% 0%, #1b2838, transparent 40%),
-    radial-gradient(circle at 90% 100%, #203024, transparent 42%),
+    radial-gradient(circle at 10% 0%, #dceeff, transparent 42%),
+    radial-gradient(circle at 90% 100%, #dff7ea, transparent 44%),
     var(--bg);
 }
 
@@ -29,10 +29,11 @@ body {
 }
 
 .panel {
-  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 18px;
+  box-shadow: 0 8px 22px #9db2c326;
 }
 
 h1 { margin: 0 0 8px; font-size: 1.4rem; }
@@ -44,7 +45,7 @@ input, select, button {
   margin-top: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0f1112;
+  background: #ffffff;
   color: var(--text);
   padding: 9px 10px;
 }
@@ -70,8 +71,9 @@ input, select, button {
 }
 button {
   cursor: pointer;
-  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 70%, #1b5e88), #1f6f9f);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 78%, #2b6f9b), #5aa6db);
   border: none;
+  color: #ffffff;
   font-weight: 700;
 }
 button:hover { filter: brightness(1.07); }
@@ -82,7 +84,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .preview {
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: repeating-conic-gradient(#20252b 0% 25%, #171b20 0% 50%) 50% / 20px 20px;
+  background: repeating-conic-gradient(#f6fafc 0% 25%, #edf3f7 0% 50%) 50% / 20px 20px;
   padding: 14px;
 }
 
@@ -90,7 +92,7 @@ canvas {
   width: 100%;
   height: auto;
   border-radius: 10px;
-  border: 1px solid #3a414a;
+  border: 1px solid #c6d3de;
   background: transparent;
 }
 
