@@ -24,6 +24,7 @@
 const ctx = el.canvas.getContext("2d", { alpha: true });
 let previewT = 0;
 let rafId = 0;
+let cachedGifWorkerBlobUrl = "";
 
 function clampNum(n, min, max, fallback) {
   const v = Number(n);
@@ -197,7 +198,7 @@ async function exportGif() {
   const gif = new window.GIF({
     workers: 2,
     quality: 8,
-    workerScript: "./vendor/gif.worker.js",
+    workerScript: resolveGifWorkerScript(),
     width: s.width,
     height: s.height,
     transparent: s.transparentBg ? parseInt(chromaHex.slice(1), 16) : null
@@ -242,6 +243,19 @@ function pickChromaKey(textColor) {
   const keys = ["#00ff00", "#ff00ff", "#00ffff", "#ffff00"];
   const normalized = String(textColor || "").toLowerCase();
   return keys.find((k) => k !== normalized) || "#00ff00";
+}
+
+function resolveGifWorkerScript() {
+  if (cachedGifWorkerBlobUrl) return cachedGifWorkerBlobUrl;
+
+  const src = window.__GIF_WORKER_SOURCE__;
+  if (typeof src === "string" && src.length > 0) {
+    const blob = new Blob([src], { type: "application/javascript" });
+    cachedGifWorkerBlobUrl = URL.createObjectURL(blob);
+    return cachedGifWorkerBlobUrl;
+  }
+
+  return "./vendor/gif.worker.js";
 }
 
 async function saveBlob(blob, fileName, mimeType) {
