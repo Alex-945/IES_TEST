@@ -197,7 +197,7 @@ async function exportGif() {
   const gif = new window.GIF({
     workers: 2,
     quality: 8,
-    workerScript: "https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.worker.js",
+    workerScript: "./vendor/gif.worker.js",
     width: s.width,
     height: s.height,
     transparent: s.transparentBg ? parseInt(chromaHex.slice(1), 16) : null
