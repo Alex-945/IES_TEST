@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkflowState {
+  PLANNING
+  BIBLE
+  OUTLINE
+  CHAPTER_PLAN
+  DRAFT
+  QA
+  EXPORT
+}
+
+model Project {
+  id                String               @id @default(cuid())
+  title             String
+  description       String?
+  workflowState     WorkflowState        @default(PLANNING)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  planningSnapshots PlanningSnapshot[]
+  bibleVersions     BibleVersion[]
+  outlineVersions   OutlineVersion[]
+  chapterPlan       ChapterPlanVersion[]
+  chapterDrafts     ChapterDraft[]
+  chapterSummaries  ChapterSummary[]
+  qaReports         QAReport[]
+  experimentRuns    ExperimentRun[]
+  exportRecords     ExportRecord[]
+}
+
+model PlanningSnapshot {
+  id         String   @id @default(cuid())
+  projectId  String
+  version    Int
+  payload    Json
+  gaps       Json?
+  createdAt  DateTime @default(now())
+  promptHash String?
+  model      String?
+  params     Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, version])
+}
+
+model BibleVersion {
+  id                 String   @id @default(cuid())
+  projectId          String
+  version            Int
+  content            Json
+  sourcePlanningVer  Int?
+  createdAt          DateTime @default(now())
+  promptHash         String?
+  model              String?
+  params             Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, version])
+}
+
+model OutlineVersion {
+  id                String   @id @default(cuid())
+  projectId         String
+  version           Int
+  content           Json
+  sourceBibleVer    Int?
+  createdAt         DateTime @default(now())
+  promptHash        String?
+  model             String?
+  params            Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, version])
+}
+
+model ChapterPlanVersion {
+  id                 String   @id @default(cuid())
+  projectId          String
+  version            Int
+  content            Json
+  sourceOutlineVer   Int?
+  createdAt          DateTime @default(now())
+  promptHash         String?
+  model              String?
+  params             Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, version])
+}
+
+model ChapterDraft {
+  id                  String   @id @default(cuid())
+  projectId           String
+  chapterNumber       Int
+  version             Int
+  content             String
+  sourceBibleVer      Int?
+  sourceOutlineVer    Int?
+  sourceChapterPlanVer Int?
+  createdAt           DateTime @default(now())
+  promptHash          String?
+  model               String?
+  params              Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, chapterNumber, version])
+}
+
+model ChapterSummary {
+  id             String   @id @default(cuid())
+  projectId      String
+  chapterNumber  Int
+  version        Int
+  summary        String
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, chapterNumber, version])
+}
+
+model QAReport {
+  id             String   @id @default(cuid())
+  projectId      String
+  chapterNumber  Int?
+  report         Json
+  score          Float?
+  hookScore      Float?
+  createdAt      DateTime @default(now())
+  promptHash     String?
+  model          String?
+  params         Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ExperimentRun {
+  id                 String   @id @default(cuid())
+  projectId          String
+  chapterNumber      Int
+  variantName        String
+  params             Json
+  draftContent       String
+  qaReport           Json?
+  qaScore            Float?
+  hookScore          Float?
+  createdAt          DateTime @default(now())
+  promptHash         String?
+  model              String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ExportRecord {
+  id             String   @id @default(cuid())
+  projectId      String
+  format         String
+  chapterScope   String
+  content        String
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}

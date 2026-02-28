@@ -1,0 +1,95 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marquee Animator</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="panel">
+      <h1>Marquee Animator</h1>
+      <p class="hint">本機可用。支援 WebM + GIF、透明背景、單行中英文跑馬燈。</p>
+
+      <label>文字
+        <input id="text" type="text" value="Hello 你好 Marquee" maxlength="120" />
+      </label>
+
+      <div class="grid">
+        <label>方向
+          <select id="direction">
+            <option value="rtl">右到左</option>
+            <option value="ltr">左到右</option>
+            <option value="ttb">上到下</option>
+            <option value="btt">下到上</option>
+          </select>
+        </label>
+
+        <label>字型
+          <select id="fontFamily">
+            <option value="'Noto Sans TC', 'Microsoft JhengHei', sans-serif">Noto Sans TC</option>
+            <option value="'Noto Serif TC', 'PMingLiU', serif">Noto Serif TC</option>
+            <option value="'Arial Black', Arial, sans-serif">Arial Black</option>
+            <option value="'Courier New', monospace">Courier New</option>
+          </select>
+        </label>
+
+        <label>字體大小
+          <input id="fontSize" type="range" min="24" max="200" value="72" />
+          <span id="fontSizeValue">72 px</span>
+        </label>
+
+        <label>速度(px/s)
+          <input id="speed" type="range" min="20" max="500" value="150" />
+          <span id="speedValue">150</span>
+        </label>
+
+        <label>時長(秒)
+          <input id="duration" type="range" min="1" max="15" value="4" />
+          <span id="durationValue">4.0</span>
+        </label>
+
+        <label>FPS
+          <input id="fps" type="range" min="10" max="60" value="30" />
+          <span id="fpsValue">30</span>
+        </label>
+
+        <label>寬度
+          <input id="width" type="number" min="64" max="1920" value="640" />
+        </label>
+
+        <label>高度
+          <input id="height" type="number" min="64" max="1080" value="200" />
+        </label>
+
+        <label>文字顏色
+          <input id="textColor" type="color" value="#ffffff" />
+        </label>
+
+        <label>背景顏色
+          <input id="bgColor" type="color" value="#000000" />
+        </label>
+
+        <label class="inline">
+          <input id="transparentBg" type="checkbox" checked />
+          透明背景
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="downloadWebm">下載 WebM</button>
+        <button id="downloadGif">下載 GIF</button>
+      </div>
+      <p id="status" class="status">Ready</p>
+    </section>
+
+    <section class="preview">
+      <canvas id="canvas" width="640" height="200"></canvas>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
