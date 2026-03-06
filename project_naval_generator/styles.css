@@ -34,14 +34,46 @@ body {
 .header h1 { margin: 0; }
 .header p { margin: 4px 0 0; color: #4b5563; }
 .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.row {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 12px;
-}
+.project-bar { margin-top: 14px; }
+.workspace-main { margin-top: 12px; }
 .api-panel {
   margin-top: 14px;
+}
+.debug-panel {
+  margin-top: 14px;
+}
+.debug-panel textarea {
+  min-height: 180px;
+  font-family: Consolas, "Courier New", monospace;
+}
+.debug-pre {
+  white-space: pre-wrap;
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 70px;
+}
+.icon-copy {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  margin-right: 6px;
+  position: relative;
+  top: 1px;
+}
+.icon-copy::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  left: -4px;
+  top: -4px;
+  background: transparent;
 }
 .api-grid {
   display: grid;
@@ -55,7 +87,7 @@ body {
 .api-grid input {
   margin-top: 4px;
 }
-.left h2, .right h2 { margin-top: 0; }
+.project-bar h2 { margin-top: 0; }
 .new-project { display: flex; gap: 8px; margin-bottom: 10px; }
 input, textarea, button {
   font: inherit;
@@ -77,9 +109,23 @@ textarea {
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  transition: transform 0.06s ease, opacity 0.15s ease, box-shadow 0.15s ease;
 }
 .btn.secondary {
   background: #243b53;
+}
+.btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+.btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.btn.busy {
+  box-shadow: 0 0 0 2px rgba(11, 110, 79, 0.25) inset;
+}
+body.is-busy {
+  cursor: progress;
 }
 .list, .history { list-style: none; margin: 0; padding: 0; }
 .list li, .history li {
@@ -89,6 +135,30 @@ textarea {
   margin-bottom: 8px;
   cursor: pointer;
 }
+.project-list-horizontal {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.project-list-horizontal li {
+  min-width: 250px;
+  margin-bottom: 0;
+}
+.project-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.project-del {
+  border: 1px solid #d9a5a5;
+  background: #fff5f5;
+  color: #7f1d1d;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
 .list li.active { border-color: var(--accent); background: #f2fffa; }
 .workspace-head { display: flex; justify-content: space-between; align-items: center; }
 .stage-nav {
@@ -96,6 +166,32 @@ textarea {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+.stage-guide {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 6px;
+}
+.stage-guide .sg-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.stage-guide .sg-item:hover {
+  border-color: #8db6a6;
+  background: #f7fffb;
+}
+.stage-guide .sg-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(11, 110, 79, 0.25);
+}
+.stage-guide .sg-item.active {
+  border-color: #0b6e4f;
+  background: #f1fff8;
 }
 .stage-nav button {
   border: 1px solid var(--line);
@@ -130,6 +226,51 @@ textarea {
   padding: 8px;
   margin-bottom: 6px;
 }
+#questionList .q-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+#questionList .q-meta-item {
+  border: 1px solid #dbe7f3;
+  border-radius: 6px;
+  background: #f8fbff;
+  padding: 6px;
+  font-size: 13px;
+}
+#questionList .q-meta-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.task-embed {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+.task-embed h4 { margin: 4px 0 8px; }
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#readinessStatus {
+  margin-top: 6px;
+  font-weight: 700;
+}
+#readinessStatus.ready {
+  color: #14532d;
+}
+#readinessStatus.not-ready {
+  color: #991b1b;
+}
+#readinessReasons {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
 #questionList .q-example {
   margin-top: 6px;
   color: #334e68;
@@ -143,7 +284,17 @@ textarea {
   min-height: 78px;
   margin-top: 8px;
 }
+#questionList .q-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
 .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn.mini {
+  padding: 4px 8px;
+  font-size: 12px;
+}
 .tag {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -151,9 +302,136 @@ textarea {
   font-size: 12px;
 }
 .empty { color: #6b7280; padding: 20px; }
+.hidden { display: none; }
+.mode-switch { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.entry-pane { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #fbfdff; }
+.entry-pane + .entry-pane { margin-top: 8px; }
+.chat-log {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+.chat-msg {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.chat-msg.user { background: #f1fff8; }
+.chat-msg.ai { background: #f6f8ff; }
+.chat-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+.chat-status {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #334e68;
+}
+.chat-status.ok { color: #14532d; }
+.chat-status.warn { color: #92400e; }
+.chat-status.err { color: #991b1b; }
+.oplog-wrap {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.oplog-head {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.oplog-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  max-height: 140px;
+  overflow: auto;
+}
+.oplog-list li {
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.oplog-list li:last-child { border-bottom: 0; }
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9999;
+  max-width: 360px;
+  background: #102a43;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(16, 42, 67, 0.25);
+}
+.toast.ok { background: #14532d; }
+.toast.warn { background: #92400e; }
+.toast.err { background: #991b1b; }
+.score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.score-item { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fff; }
+.score-item div { font-size: 24px; font-weight: 700; margin-top: 6px; }
+.risk-detail {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+.risk-detail ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+.risk-detail li {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.readiness-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px dashed #d6deeb;
+  padding: 6px 0;
+}
+.readiness-item:last-child {
+  border-bottom: 0;
+}
+.readiness-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.readiness-note {
+  width: 100%;
+  font-size: 12px;
+  color: #4b5563;
+}
+.readiness-input {
+  width: 100%;
+  min-height: 74px;
+}
+.lock-row { display: block; margin-top: 10px; font-size: 14px; }
+#questionList .q-feedback {
+  margin-top: 6px;
+  border-left: 3px solid #7aa6c2;
+  padding: 6px 8px;
+  background: #f4f9ff;
+  border-radius: 6px;
+  font-size: 13px;
+}
+#advancedPaste { min-height: 160px; }
+#autoFillHintsInput { min-height: 90px; }
 
 @media (max-width: 960px) {
-  .row { grid-template-columns: 1fr; }
   .grid { grid-template-columns: 1fr; }
   .api-grid { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: 1fr; }
+  .chat-row { grid-template-columns: 1fr; }
+  .stage-guide { grid-template-columns: 1fr; }
+  #questionList .q-meta-grid { grid-template-columns: 1fr; }
 }

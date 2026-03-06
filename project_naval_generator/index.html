@@ -17,24 +17,29 @@
         <button id="pickFolderBtn" class="btn">選擇 data 資料夾</button>
         <button id="exportBtn" class="btn secondary">匯出專案 JSON</button>
         <button id="importBtn" class="btn secondary">匯入專案 JSON</button>
+        <button id="toggleDebugBtn" data-busy-ignore="true" class="btn secondary">診斷模式：ON</button>
+        <button id="exportDebugBtn" data-busy-ignore="true" class="btn secondary">匯出診斷包</button>
+        <button id="clearDebugBtn" data-busy-ignore="true" class="btn secondary">清空診斷</button>
+        <button id="forceUnlockBtn" data-busy-ignore="true" class="btn secondary">強制解鎖</button>
+        <span id="debugStatus" class="tag">Debug: ON</span>
         <input id="importFile" type="file" accept="application/json" hidden />
       </div>
     </header>
 
     <section class="card api-panel">
-      <h2>API 接入區</h2>
+      <h2>API 接入區 / API Connection</h2>
       <div class="api-grid">
         <label>
-          Base URL
-          <input id="apiBaseUrl" placeholder="https://api.deepseek.com" />
+          Base URL / 服務位址
+          <input id="apiBaseUrl" placeholder="例 Example: https://api.deepseek.com" />
         </label>
         <label>
-          Model
-          <input id="apiModel" placeholder="deepseek-chat" />
+          Model / 模型名稱
+          <input id="apiModel" placeholder="例 Example: deepseek-chat" />
         </label>
         <label>
-          API Key
-          <input id="apiKey" type="password" placeholder="sk-..." />
+          API Key / 金鑰
+          <input id="apiKey" type="password" placeholder="例 Example: sk-xxxx" />
         </label>
       </div>
       <div class="actions">
@@ -44,18 +49,27 @@
       </div>
     </section>
 
-    <section class="card row">
-      <div class="left">
-        <h2>Projects</h2>
-        <div class="new-project">
-          <input id="projectName" placeholder="新專案名稱" />
-          <button id="createProjectBtn" class="btn">新增</button>
-        </div>
-        <ul id="projectList" class="list"></ul>
+    <section class="card debug-panel">
+      <h2>診斷面板 / Debug Panel</h2>
+      <div class="actions">
+        <button id="refreshDebugBtn" data-busy-ignore="true" class="btn secondary">更新內容</button>
+        <button id="copyDebugBtn" data-busy-ignore="true" class="btn secondary"><span class="icon-copy" aria-hidden="true"></span>一鍵複製</button>
       </div>
-      <div class="right" id="workspace">
-        <div class="empty">先建立或選擇一個專案</div>
+      <div id="debugMeta" class="chat-status">尚無資料</div>
+      <textarea id="debugViewer" readonly placeholder="這裡會顯示診斷紀錄（可直接複製貼給我）"></textarea>
+    </section>
+
+    <section class="card project-bar">
+      <h2>Projects / 專案</h2>
+      <div class="new-project">
+        <input id="projectName" placeholder="新專案名稱 / Project Name（例：潮汐引擎）" />
+        <button id="createProjectBtn" class="btn">新增 / Create</button>
       </div>
+      <ul id="projectList" class="list project-list-horizontal"></ul>
+    </section>
+
+    <section class="card workspace-main" id="workspace">
+      <div class="empty">先建立或選擇一個專案</div>
     </section>
   </div>
 
@@ -65,41 +79,125 @@
       <span id="folderStatus" class="tag">未綁定資料夾</span>
     </div>
 
-    <nav id="stageNav" class="stage-nav"></nav>
-
-    <div class="grid">
-      <article class="card panel">
-        <h3>現有資料摘要</h3>
-        <pre id="summaryBox"></pre>
-      </article>
-
-      <article class="card panel">
-        <h3>Gap List</h3>
-        <ul id="gapList"></ul>
-      </article>
-
-      <article class="card panel full">
-        <h3>編輯式追問（最多 3 題）</h3>
-        <div id="questionList"></div>
-      </article>
-
-      <article class="card panel full">
-        <h3>工作區</h3>
-        <div id="editorForm"></div>
-        <div class="actions">
-          <button id="saveStageBtn" class="btn">儲存版本</button>
-          <button id="nextStageBtn" class="btn secondary">前進下一階段</button>
-          <button id="runQaBtn" class="btn secondary">產生 QA 建議</button>
+    <article class="card panel full">
+      <h3>智慧入口 / Smart Intake</h3>
+      <div id="autoPane" class="entry-pane">
+        <div class="chat-status">
+          請輸入一句故事想法或貼上你的設定片段。系統會自動判定完整度並給出下一步。
         </div>
-      </article>
+        <div class="chat-row">
+          <input id="autoIdeaInput" placeholder="例：都市懸疑奇幻；失憶潛航員發現自己是潮汐引擎唯一鑰匙" />
+          <button id="autoGenerateBtn" class="btn">分析並生成策略初稿</button>
+        </div>
+        <div id="intakeLevel" class="chat-status">判定：尚未分析</div>
+        <div class="actions">
+          <button id="autoFillGapsBtn" class="btn secondary">補齊至可進下一階段</button>
+        </div>
+        <div class="risk-detail">
+          <strong>初次生成分析與二次補齊建議</strong>
+          <pre id="autoAnalysisBox" class="debug-pre"></pre>
+          <label>
+            作者補充想法（會帶入二次補齊）/ Author Hints
+            <textarea id="autoFillHintsInput" placeholder="例：結局想走苦甜；禁忌要避免失憶洗白；語氣偏冷冽壓迫。"></textarea>
+          </label>
+        </div>
+        <div id="autoStatus" class="chat-status">狀態：待命</div>
+      </div>
+      <div id="beginnerPane" class="entry-pane hidden">
+        <div id="chatLog" class="chat-log"></div>
+        <div class="chat-row">
+          <input id="chatInput" placeholder="輸入你的想法，例如：我想寫一個海港城市的懸疑奇幻故事" />
+          <button id="chatSendBtn" class="btn">送出 / Send</button>
+        </div>
+        <div id="chatStatus" class="chat-status">狀態：待命</div>
+        <div class="actions">
+          <button id="chatToTemplateBtn" class="btn secondary">把對話轉成 Planning 草稿</button>
+        </div>
+        <div id="actionStatus" class="chat-status">操作訊息：尚無</div>
+        <div class="oplog-wrap">
+          <div class="oplog-head">操作日誌 / Operation Log</div>
+          <ul id="opLog" class="oplog-list"></ul>
+        </div>
+      </div>
+      <div id="advancedPane" class="entry-pane hidden">
+        <div class="actions">
+          <button id="downloadTemplateBtn" class="btn">下載標準模板 / Download Template</button>
+          <button id="importTemplateBtn" class="btn secondary">匯入模板檔 / Import Template</button>
+          <input id="importTemplateFile" type="file" accept="application/json" hidden />
+        </div>
+        <textarea id="advancedPaste" placeholder="貼上你的完整設定 JSON（例：market_format / world_rules / characters...）"></textarea>
+        <div class="actions">
+          <button id="applyTemplateBtn" class="btn">套用到 Planning</button>
+        </div>
+      </div>
+      <div class="task-embed">
+        <div class="task-head">
+          <h4>補充資訊任務（單題模式）</h4>
+          <button id="toggleTasksBtn" class="btn secondary">展開</button>
+        </div>
+        <div id="taskBody">
+          <div class="actions">
+            <button id="refreshTasksBtn" class="btn secondary">補充資料</button>
+            <button id="clearChatBtn" class="btn secondary">清空對話</button>
+            <button id="applyAnswersBtn" class="btn">套用回答到目前資料</button>
+          </div>
+          <div id="questionList"></div>
+        </div>
+      </div>
+    </article>
 
-      <article class="card panel full">
-        <h3>版本歷史</h3>
-        <ul id="historyList" class="history"></ul>
-      </article>
-    </div>
+    <article class="card panel full">
+      <h3>創作儀表板 / Confidence Panel</h3>
+      <div class="score-grid">
+        <div class="score-item"><strong>完整度 Coverage</strong><div id="scoreCoverage">0</div></div>
+        <div class="score-item"><strong>一致性風險 Consistency Risk</strong><div id="scoreRisk">0</div></div>
+        <div class="score-item"><strong>商業鉤子 Hook Strength</strong><div id="scoreHook">0</div></div>
+      </div>
+      <div class="risk-detail">
+        <strong>就緒判定 / Readiness Gate</strong>
+        <div id="readinessModeHint" class="chat-status">Mode: - , Required Coverage: -</div>
+        <div id="readinessStatus">Not Ready</div>
+        <ul id="readinessReasons"></ul>
+      </div>
+      <div class="risk-detail">
+        <strong>剩餘缺口（AI 可補）</strong>
+        <ul id="readinessAIFillList"></ul>
+      </div>
+      <div class="risk-detail">
+        <strong>作者必確認（不可自動定稿）</strong>
+        <ul id="readinessAuthorList"></ul>
+      </div>
+      <div class="actions">
+        <button id="readinessFillAllBtn" class="btn secondary">一鍵補齊可自動項目</button>
+        <button id="readinessOpenConfirmBtn" class="btn secondary">開啟作者確認卡</button>
+        <button id="readinessRecheckBtn" class="btn">重新檢查 Readiness</button>
+      </div>
+      <div class="risk-detail">
+        <strong>Readiness 行動紀錄</strong>
+        <ul id="readinessActionLog"></ul>
+      </div>
+      <div class="risk-detail">
+        <strong>一致性衝突明細 / Conflict Details</strong>
+        <ul id="riskDetails"></ul>
+      </div>
+      <label class="lock-row">
+        <input id="lockHardRules" type="checkbox" />
+        鎖定世界硬規則 / Lock `world_rules.hard_rules`（AI 不可改）
+      </label>
+    </article>
+
+    <article class="card panel full">
+      <h3>流程切換 / Workflow</h3>
+      <div id="stageGuide" class="stage-guide"></div>
+    </article>
+
+    <article class="card panel full">
+      <h3 id="phaseTitle">工作區 / Workspace</h3>
+      <div id="phaseWorkspace"></div>
+    </article>
   </template>
 
+  <div id="toast" class="toast hidden"></div>
   <script src="./app.js"></script>
 </body>
 </html>
