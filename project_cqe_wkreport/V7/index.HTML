@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>CQE Report System V7.0 (DeepSeek AI)</title>
+    <style>
+        :root { --primary-red: #e74c3c; --dark-blue: #2c3e50; --bg-gray: #f4f7f6; --success-green: #27ae60; --audit-purple: #8e44ad; --mode-orange: #d35400; --google-blue: #4285F4; }
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: var(--bg-gray); padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); position: relative; }
+        
+        .header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h2 { color: var(--dark-blue); border-left: 6px solid var(--primary-red); padding-left: 15px; margin: 0; }
+        
+        /* 設定按鈕 */
+        .settings-btn { background: #f1c40f; color: #333; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .settings-btn:hover { background: #f39c12; }
+
+        .tabs { display: flex; gap: 5px; border-bottom: 2px solid #ddd; flex-wrap: wrap; }
+        .tab { padding: 10px 15px; cursor: pointer; background: #eee; border-radius: 8px 8px 0 0; color: #666; font-weight: bold; font-size: 0.95em; }
+        .tab.active { background: white; border-top: 3px solid var(--primary-red); color: var(--dark-blue); margin-bottom: -2px; }
+        .tab-visit { border-top-color: var(--audit-purple) !important; color: var(--audit-purple) !important; } 
+        .tab-table { background: #3498db; color: white; }
+        .tab-mode { background: var(--mode-orange); color: white; }
+        .tab-log { background: #2c3e50; color: white; }
+
+        .form-section { display: none; padding: 20px; border: 1px solid #ddd; border-top: none; background: white; border-radius: 0 0 8px 8px; }
+        .form-section.active { display: block; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        label { font-size: 0.85em; font-weight: 600; color: #555; display: block; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .missing-info { border: 2px solid var(--primary-red) !important; background: #fff5f5; }
+        .other-input { display: none; margin-top: 5px; border-color: var(--primary-red); background: #fffcfc; }
+        
+        .phrase-bank { margin-top: 5px; margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+        .phrase-btn { background: #ecf0f1; border: 1px solid #bdc3c7; color: #2c3e50; padding: 5px 10px; border-radius: 15px; font-size: 0.85em; cursor: pointer; }
+        
+        /* DeepSeek 按鈕 */
+        .ai-btn-small { background: #6c5ce7; color: white; border: none; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9em; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .ai-btn-small:hover { background: #5f27cd; }
+
+        #table-search, #mode-search { margin-bottom: 15px; padding: 10px; border: 2px solid #3498db; width: 100%; box-sizing: border-box; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .data-table th { background: #f8f9fa; }
+        .use-btn { background: var(--success-green); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+
+        .btn-main { width: 100%; padding: 15px; background: var(--dark-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 15px; }
+        .result-box { background: #1e272e; color: white; padding: 25px; border-radius: 8px; margin-top: 25px; position: relative; }
+        .copy-btn { position: absolute; top: 15px; right: 15px; background: var(--primary-red); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        
+        .ai-zone { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed #3498db; position: relative; }
+        .ai-run-btn { background:#3498db; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; margin-top:10px; font-size:15px; }
+
+        /* 進版日誌樣式 */
+        .log-entry { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc; line-height: 1.5; }
+        .log-ver { font-weight: bold; color: var(--primary-red); font-size: 1.1em; display: inline-block; margin-bottom: 5px; }
+
+        /* API 設定彈窗 */
+        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal { background: white; padding: 25px; border-radius: 8px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal h3 { margin-top: 0; color: var(--dark-blue); }
+        .modal input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+        .btn-save { background: var(--success-green); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        .btn-cancel { background: #95a5a6; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+
+        /* Loading 遮罩 */
+        .loader-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.8); z-index: 2000; flex-direction: column; justify-content: center; align-items: center; }
+        .spinner { border: 6px solid #f3f3f3; border-top: 6px solid var(--primary-red); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loader-text { font-weight: bold; color: var(--dark-blue); font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<!-- API 金鑰設定 Modal -->
+<div id="api-modal" class="modal-overlay">
+    <div class="modal">
+        <h3>⚙️ DeepSeek API 設定</h3>
+        <p style="font-size:0.9em; color:#666;">金鑰將安全地儲存於您的瀏覽器本地端，不會外洩。</p>
+        <input type="password" id="api-key-input" placeholder="請輸入 DeepSeek API Key (sk-...)">
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeApiModal()">取消</button>
+            <button class="btn-save" onclick="saveApiKey()">儲存金鑰</button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading 遮罩 -->
+<div id="loader" class="loader-overlay">
+    <div class="spinner"></div>
+    <div class="loader-text" id="loader-msg">DeepSeek AI 處理中...</div>
+</div>
+
+<div class="container">
+    <div class="header-area">
+        <h2>CQE 週報標準化系統 V7.0 (AI Powered)</h2>
+        <button class="settings-btn" onclick="openApiModal()">⚙️ API 設定</button>
+    </div>
+
+    <div class="ai-zone">
+        <label>🤖 DeepSeek 語意拆解預填 (支援: 異常、拜訪、會議)</label>
+        <textarea id="ai-raw-text" rows="3" placeholder="請貼上客戶信件或口語描述。系統將自動拆解並提取為 JSON 填入表單..."></textarea>
+        <button class="ai-run-btn" onclick="runAiParsing()">✨ 執行 DeepSeek 結構化擷取</button>
+    </div>
+
+    <div class="tabs">
+        <div id="tab-issue" class="tab active" onclick="switchTab('issue')">異常案例 (Issue)</div>
+        <div id="tab-visit" class="tab tab-visit" onclick="switchTab('visit')">互動與稽核 (Interaction)</div>
+        <div id="tab-activity" class="tab" onclick="switchTab('activity')">品質活動 (Activity)</div>
+        <div id="tab-table" class="tab tab-table" onclick="switchTab('table')">🔍 專案對照表</div>
+        <div id="tab-mode" class="tab tab-mode" onclick="switchTab('mode')">⚠️ 完整字典</div>
+        <div id="tab-log" class="tab tab-log" onclick="switchTab('log')">📜 進版日誌</div>
+    </div>
+
+    <!-- 1. 異常案例 -->
+    <div id="issue-sec" class="form-section active">
+        <div class="grid">
+            <div><label>廠區 (Site)</label><select id="iss-site"><option value="IPT">IPT (上海廠)</option><option value="IME">IME (墨西哥廠)</option><option value="ITE">ITE (泰國廠)</option><option value="TAO">TAO (桃園廠)</option><option value="TRDC">TRDC (大溪廠)</option><option value="WW">WW (全球)</option></select></div>
+            <div><label>指標</label><select id="iss-ind"><option value="VLRR">VLRR</option><option value="0KM">0KM</option><option value="FR">FR</option><option value="IQC">IQC</option><option value="Internal">Internal</option></select></div>
+        </div>
+        <div class="grid">
+            <div><label>發現者</label><input type="text" id="iss-found" class="req-issue"></div>
+            <div><label>客戶</label><input type="text" id="iss-cust" class="req-issue"></div>
+        </div>
+        <div class="grid">
+            <div><label>產品別</label><input type="text" id="iss-prod" class="req-issue"></div>
+            <div><label>專案名稱</label><input type="text" id="iss-proj" class="req-issue"></div>
+        </div>
+        <div class="grid">
+            <div><label>失效現象</label><input type="text" id="iss-sym" class="req-issue"></div>
+            <div><label>數量</label><input type="text" id="iss-qty" class="req-issue"></div>
+        </div>
+        <div class="grid">
+            <div><label>日期 (M/D)</label><input type="text" id="iss-date" class="req-issue"></div>
+            <div><label>責任</label><select id="iss-liab"><option value="Under FA">Under FA</option><option value="PID">PID</option><option value="VID">VID</option><option value="CID">CID</option><option value="NTF">NTF</option></select></div>
+        </div>
+        <label>結論/狀態備註</label>
+        <div class="phrase-bank" id="issue-phrases">
+            <!-- 預設快捷鍵由此渲染 -->
+        </div>
+        <textarea id="iss-concl" rows="3" class="req-issue" placeholder="請輸入結論..."></textarea>
+    </div>
+
+    <!-- 2. 互動與稽核 -->
+    <div id="visit-sec" class="form-section">
+        <div class="grid">
+            <div><label>廠區 (Site)</label><select id="vis-site"><option value="IPT">IPT</option><option value="IME">IME</option><option value="ITE">ITE</option><option value="TAO">TAO</option><option value="TRDC">TRDC</option><option value="WW">WW</option></select></div>
+            <div><label>事件類型</label>
+                <select id="vis-type">
+                    <option value="Customer Visit">客戶來訪 (Inbound)</option>
+                    <option value="CQE Visit">CQE 主動拜訪 (Outbound)</option>
+                    <option value="Audit">稽核 (Audit)</option>
+                    <option value="Meeting">會議/視訊 (Meeting)</option>
+                    <option value="Other">其他 (Other)</option>
+                </select>
+                <input type="text" id="vis-type-other" class="other-input" placeholder="請輸入事件類型...">
+            </div>
+        </div>
+        <div class="grid">
+            <div><label>發起者 (Who)</label><input type="text" id="vis-who" class="req-visit" placeholder="e.g. Kostal / HQ QS"></div>
+            <div><label>日期 (必須含年份 YYYY/MM/DD)</label><input type="text" id="vis-date" class="req-visit" placeholder="2026/02/15"></div>
+        </div>
+        <div class="grid">
+            <div><label>事件說明/目的 (Event Description)</label><input type="text" id="vis-desc" class="req-visit" placeholder="e.g. VDA6.3 / QBR"></div>
+        </div>
+        <label>結果/待辦 (Status)</label>
+        <textarea id="vis-res" rows="3" class="req-visit" placeholder="e.g. 發現 2 項缺失..."></textarea>
+    </div>
+
+    <!-- 3. 品質活動 -->
+    <div id="activity-sec" class="form-section">
+        <div class="grid">
+            <div><label>廠區</label><select id="act-site"><option value="IPT">IPT</option><option value="WW">WW</option></select></div>
+            <div><label>活動類別</label>
+                <select id="act-cat">
+                    <option value="QIT">QIT (品質改進)</option>
+                    <option value="QCC">QCC (品管圈)</option>
+                    <option value="System">System (系統優化)</option>
+                    <option value="Other">其他 (Other)</option>
+                </select>
+                <input type="text" id="act-cat-other" class="other-input" placeholder="請輸入類別...">
+            </div>
+        </div>
+        <div class="grid">
+            <div><label>專案名稱 (Project Name)</label><input type="text" id="act-name" class="req-act"></div>
+            <div><label>進度 (Status)</label>
+                <select id="act-stat">
+                    <option value="提交計畫">提交計畫 (Plan Submitted)</option>
+                    <option value="進行中">進行中 (In Progress)</option>
+                    <option value="結案">結案 (Closed)</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid">
+            <div><label>預計結案 (CP)</label><input type="text" id="act-cp" class="req-act" placeholder="e.g. 2026/05"></div>
+            <div><label>需要主管協助 (Help Needed) - 選填</label><input type="text" id="act-help"></div>
+        </div>
+    </div>
+
+    <div id="table-sec" class="form-section"><input type="text" id="table-search" placeholder="搜尋..." onkeyup="searchTable()"><table class="data-table"><tbody id="table-body"></tbody></table></div>
+    <div id="mode-sec" class="form-section"><input type="text" id="mode-search" placeholder="搜尋..." onkeyup="searchMode()"><table class="data-table"><tbody id="mode-body"></tbody></table></div>
+
+    <!-- ★ 全量進版日誌區塊 ★ -->
+    <div id="log-sec" class="form-section">
+        <div class="log-entry"><span class="log-ver">V7.0 (2026/02/24)</span><br>導入 DeepSeek API，實現「結構化 JSON 擷取」與「攜帶專業字典的 AI 翻譯」，加入 API 金鑰安全儲存機制與 Loading 動畫。格式封裝由程式碼維持絕對標準。</div>
+        <div class="log-entry"><span class="log-ver">V6.0 (2026/02/07)</span><br>時態邏輯引擎實裝。新增年份強制輸入、未來/過去式自動切換、互動模組 5W1H 欄位優化、品質活動 UI 改版 (包含 Other 連動)。</div>
+        <div class="log-entry"><span class="log-ver">V5.7 (2026/02/04)</span><br>智慧解析積分制，解決 BYD/NIO 誤判，加入資料清洗去除表頭雜訊。</div>
+        <div class="log-entry"><span class="log-ver">V5.6 (2026/02/04)</span><br>智慧解析修復與同義詞擴充，加入無效輸入的報錯提示。</div>
+        <div class="log-entry"><span class="log-ver">V5.5 (2026/02/04)</span><br>資料夾模組化架構確認，徹底分離 HTML / JS / Data。</div>
+        <div class="log-entry"><span class="log-ver">V5.4 (2026/02/04)</span><br>單檔緊急修復版 (解決因權限限制導致的白畫面)。</div>
+        <div class="log-entry"><span class="log-ver">V5.3 (2026/02/03)</span><br>解決變數衝突與白畫面問題。</div>
+        <div class="log-entry"><span class="log-ver">V5.2 (2026/02/03)</span><br>辭庫災難恢復，找回 40+ SMT 術語，並優化 Phrase / Word 匹配層級。</div>
+        <div class="log-entry"><span class="log-ver">V5.1 (2026/02/03)</span><br>新增 Google 翻譯智慧彈窗，避開 iframe 限制。</div>
+        <div class="log-entry"><span class="log-ver">V5.0 (2026/02/03)</span><br>新增常用語句庫 (Phrase Bank) 與整句翻譯支援。</div>
+        <div class="log-entry"><span class="log-ver">V4.x (2026/02/03)</span><br>介面優化、下拉選單統一、防斷電 LocalStorage 實裝、專案對照表建立。</div>
+        <div class="log-entry"><span class="log-ver">V3.0 (2026/02/01)</span><br>初始 AI 解析邏輯導入 (Rule-based 正則表達式)。</div>
+        <div class="log-entry"><span class="log-ver">V2.0 (2026/01/28)</span><br>增加 Visit 與 Activity 分頁擴充。</div>
+        <div class="log-entry"><span class="log-ver">V1.0 (2026/01/25)</span><br>系統原型建立，確立 Issue 標準句型與 UI 佈局。</div>
+    </div>
+
+    <button class="btn-main" onclick="generateReport()">🤖 呼叫 AI 翻譯並生成標準 Summary</button>
+
+    <div class="result-box">
+        <button class="copy-btn" onclick="copyResult()">Copy</button>
+        <div id="out-cn">[中文 Summary]</div>
+        <div id="out-en" style="color: #95a5a6; border-top: 1px solid #444; margin-top: 15px; padding-top: 10px; font-style: italic;">[English Summary]</div>
+    </div>
+</div>
+
+<script src="data.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

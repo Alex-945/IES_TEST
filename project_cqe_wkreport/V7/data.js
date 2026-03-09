@@ -1,0 +1,83 @@
+/* 檔案：data.js (V7.0)
+   用途：CQE 週報系統資料庫 (支援 LLM 字典提供)
+*/
+
+const projectTable = [
+    {c: "Kostal", d: "AUTO OPT,3394,LOWER HOUSING+PLATE,WHITE", p: "Jiading"},
+    {c: "Kostal", d: "AUTO OPT,3394,LOWER HOUSING+PLATE,BLACK (NIO FOB)", p: "Jiading"},
+    {c: "Kostal/NIO", d: "FOB 汽車鑰匙(黑)", p: "Jiading"},
+    {c: "Kostal/NIO", d: "BTM 藍牙模組 (NIO BTM)", p: "Jiading"},
+    {c: "Kostal/BYD", d: "BTM 藍牙模組 (BYD UWB)", p: "Pudong"},
+    {c: "Kostal/JMC", d: "CCU (Center control unit)", p: "Changning"},
+    {c: "Kostal/JMC", d: "CCU JCE3-V / JCE3-T", p: "Changning"},
+    {c: "Kostal/JMC", d: "ZCU (Zone Control Unit)", p: "SongJiang"},
+    {c: "Kostal/JMC", d: "BDM 區域控制模組", p: "HONGQIAO"},
+    {c: "Baidu", d: "RSU 路側放大器", p: "Minjiang"},
+    {c: "HCMF", d: "新天窗馬達組合 NSPR", p: "Fengxian"},
+    {c: "HCMF/STAL", d: "天窗馬達ECU (NSPR/OETM)", p: "Jinshan"},
+    {c: "HCMF/STAL", d: "天窗馬達ECU (ZhouShan)", p: "ZhouShan"},
+    {c: "Kostal/Volvo", d: "電動窗控制開關 (CMA5/CMA6)", p: "Hat-trick"},
+    {c: "Kostal/MMC", d: "電動窗控制開關 (MMC)", p: "Hat-trick"},
+    {c: "Kostal/GWM", d: "門模塊控制器 DCU", p: "Tianchi"},
+    {c: "Kostal/AUDI", d: "門模塊控制器 DCU", p: "Hengshan"},
+    {c: "Kostal/VW", d: "門模塊控制器 DCU", p: "Hengshan"},
+    {c: "Kostal/Mazda", d: "車載充電機 OBC", p: "Qingpu"},
+    {c: "Kostal/Mazda", d: "OBC DCDC / DC Filter", p: "Qingpu"},
+    {c: "Forvia", d: "Car Audio (Shoko Main board)", p: "Shoko"},
+    {c: "Boach Wuxi", d: "高壓風扇電機控制器", p: "TBD"},
+    {c: "HCMF/GWM", d: "天窗馬達組合 Roof ECU (HCMF SPR)", p: "Zhoushan"},
+    {c: "HCMF", d: "CEER DCU", p: "Jiangshan"}
+];
+
+const dictionary = [
+    {cn: "AOI 大圖已確認現象存在", en: "AOI image confirmed the defect existence", type: "Phrase"},
+    {cn: "已召開初次分析會議", en: "Initial analysis meeting held", type: "Phrase"},
+    {cn: "詳細請見 one pager", en: "Please refer to one pager for details", type: "Phrase"},
+    {cn: "已安排換貨", en: "Replacement arranged", type: "Phrase"},
+    {cn: "待客戶確認", en: "Pending customer confirmation", type: "Phrase"},
+    {cn: "持續監控中", en: "Keep monitoring", type: "Phrase"},
+    {cn: "已退回分析", en: "Returned for analysis", type: "Phrase"},
+    {cn: "分析中", en: "Under FA", type: "Phrase"},
+    {cn: "電容", en: "Capacitor", type: "Word"},
+    {cn: "電阻", en: "Resistor", type: "Word"},
+    {cn: "電感", en: "Inductor", type: "Word"},
+    {cn: "二極管", en: "Diode", type: "Word"},
+    {cn: "連接器", en: "Connector", type: "Word"},
+    {cn: "PCB", en: "PCB", type: "Word"},
+    {cn: "IC", en: "IC", type: "Word"},
+    {cn: "BGA", en: "BGA", type: "Word"},
+    {cn: "刮痕", en: "scratch", type: "Word"},
+    {cn: "破損", en: "damaged", type: "Word"},
+    {cn: "裂紋", en: "crack", type: "Word"},
+    {cn: "短路", en: "short circuit", type: "Word"},
+    {cn: "開路", en: "open circuit", type: "Word"},
+    {cn: "連錫", en: "solder bridge", type: "Word"},
+    {cn: "立碑", en: "tombstone", type: "Word"},
+    {cn: "少錫", en: "insufficient solder", type: "Word"},
+    {cn: "多錫", en: "excess solder", type: "Word"},
+    {cn: "冷焊", en: "cold solder", type: "Word"},
+    {cn: "錫珠", en: "solder ball", type: "Word"},
+    {cn: "氣泡", en: "void", type: "Word"},
+    {cn: "缺件", en: "component missing", type: "Word"},
+    {cn: "錯件", en: "wrong component", type: "Word"},
+    {cn: "極性反", en: "polarity reversed", type: "Word"},
+    {cn: "偏移", en: "shifted", type: "Word"},
+    {cn: "分層", en: "delamination", type: "Word"},
+    {cn: "氧化", en: "oxidation", type: "Word"},
+    {cn: "異物", en: "foreign material", type: "Word"},
+    {cn: "凹陷", en: "dent", type: "Word"},
+    {cn: "變形", en: "deformation", type: "Word"},
+    {cn: "功能失效", en: "function failure", type: "Word"},
+    {cn: "無法連線", en: "connection failure", type: "Word"},
+    {cn: "查無異常", en: "NTF (No Trouble Found)", type: "Word"},
+    {cn: "EOS", en: "EOS", type: "Word"},
+    {cn: "燒毀", en: "burned", type: "Word"}
+];
+
+const quickPhrases = [
+    "AOI 大圖已確認現象存在", 
+    "已召開初次分析會議", 
+    "詳細請見 one pager", 
+    "已安排換貨", 
+    "待客戶確認"
+];

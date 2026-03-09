@@ -76,6 +76,9 @@ const NON_GUESSABLE_FIELDS = [
 ];
 let folderHandle = null;
 let state = loadState();
+let activeLlmController = null;
+let taskModalTimer = null;
+let taskModalStartAt = 0;
 
 const $ = (id) => document.getElementById(id);
 const projectListEl = $("projectList");
@@ -84,6 +87,7 @@ const workspaceEl = $("workspace");
 init();
 
 function init() {
+  ensureUiState();
   $("createProjectBtn").addEventListener("click", createProject);
   $("pickFolderBtn").addEventListener("click", pickFolder);
   $("exportBtn").addEventListener("click", exportCurrentProject);
@@ -92,8 +96,15 @@ function init() {
   $("exportDebugBtn").addEventListener("click", exportDebugPack);
   $("clearDebugBtn").addEventListener("click", clearDebugLog);
   $("forceUnlockBtn").addEventListener("click", forceUnlockActiveProject);
+  $("taskModalAbortBtn").addEventListener("click", abortActiveAiTask);
   $("refreshDebugBtn").addEventListener("click", renderDebugViewer);
   $("copyDebugBtn").addEventListener("click", copyDebugViewer);
+  $("debugProjectOnly").addEventListener("change", (e) => {
+    ensureDebugState();
+    state.debug.projectOnly = !!e?.target?.checked;
+    saveState();
+    renderDebugViewer();
+  });
   $("importFile").addEventListener("change", importProjectJson);
   $("saveApiBtn").addEventListener("click", saveApiConfig);
   $("testApiBtn").addEventListener("click", testApiConnection);
@@ -117,20 +128,59 @@ function init() {
   pushDebugLog("app.init", { ok: true });
   renderDebugViewer();
   renderProjectList();
+  bindCollapsiblePanels(document);
 }
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { projects: [], activeProjectId: null, api: defaultApiConfig(), debug: defaultDebugConfig() };
+    if (!raw) return { projects: [], activeProjectId: null, api: defaultApiConfig(), debug: defaultDebugConfig(), ui: { collapsed: {} } };
     return hydrateState(JSON.parse(raw));
   } catch {
-    return { projects: [], activeProjectId: null, api: defaultApiConfig(), debug: defaultDebugConfig() };
+    return { projects: [], activeProjectId: null, api: defaultApiConfig(), debug: defaultDebugConfig(), ui: { collapsed: {} } };
   }
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function ensureUiState() {
+  if (!state.ui || typeof state.ui !== "object") state.ui = {};
+  if (!state.ui.collapsed || typeof state.ui.collapsed !== "object") state.ui.collapsed = {};
+}
+
+function isPanelCollapsed(id) {
+  ensureUiState();
+  return !!state.ui.collapsed[id];
+}
+
+function setPanelCollapsed(id, collapsed) {
+  ensureUiState();
+  state.ui.collapsed[id] = !!collapsed;
+  saveState();
+}
+
+function bindCollapsiblePanels(root = document) {
+  ensureUiState();
+  const nodes = root.querySelectorAll("[data-collapsible-id]");
+  nodes.forEach((panel) => {
+    const id = panel.getAttribute("data-collapsible-id");
+    if (!id) return;
+    const body = panel.querySelector("[data-collapse-body]");
+    const btn = panel.querySelector("[data-collapse-btn]");
+    if (!body || !btn) return;
+    const apply = () => {
+      const collapsed = isPanelCollapsed(id);
+      body.classList.toggle("hidden", collapsed);
+      btn.textContent = collapsed ? "展開" : "收合";
+    };
+    btn.onclick = () => {
+      setPanelCollapsed(id, !isPanelCollapsed(id));
+      apply();
+    };
+    apply();
+  });
 }
 
 function createProject() {
@@ -149,9 +199,25 @@ function createProject() {
     authorInputs: {},
     autoFillHints: "",
     intakeLevel: "未輸入",
+    intakeCompleted: false,
+    showIntakeOverride: false,
     phaseEdit: { STRATEGY: true, PILOT: false, PRODUCTION: false, QA: false, EXPORT: false },
-    production: { chapterPlanConfirmed: false, dissatisfaction: "", strategyFeedback: "", draftStatus: "待命", draftErrorCode: "", targetChapterNo: 1 },
-    runtime: { busy: false, task: "", taskId: "", startedAt: "" },
+    production: {
+      chapterPlanConfirmed: false,
+      dissatisfaction: "",
+      strategyFeedback: "",
+      draftStatus: "待命",
+      draftErrorCode: "",
+      targetChapterNo: 1,
+      batchFrom: 1,
+      batchTo: 5,
+      run: { running: false, currentChapterNo: 0, from: 1, to: 5, total: 0, completed: 0, failed: 0, updatedAt: "" }
+    },
+    chapterDrafts: {},
+    pilot: { text: "", qa: "", status: "待命", errorCode: "", dissatisfaction: "", rewriteCandidate: "" },
+    qaDecisions: {},
+    qaRewriteCandidate: "",
+    runtime: { busy: false, task: "", taskId: "", startedAt: "", abortRequested: false },
     readinessLog: [],
     chatHistory: [
       {
@@ -241,18 +307,40 @@ function renderWorkspace() {
   renderPhaseWorkspace(project);
   setProjectBusyUI(project, !!project.runtime?.busy, project.runtime?.task || "");
   renderDebugViewer();
+  bindCollapsiblePanels(workspaceEl);
 }
 
 function renderEntryExperience(project) {
   const autoPane = $("autoPane");
+  const intakeLockedPane = $("intakeLockedPane");
+  const reopenIntakeBtn = $("reopenIntakeBtn");
   const taskBody = $("taskBody");
   const toggleTasksBtn = $("toggleTasksBtn");
   const beginnerPane = $("beginnerPane");
   const advancedPane = $("advancedPane");
   project.entryMode = "smart";
-  if (autoPane) autoPane.classList.remove("hidden");
+  if (!project.intakeCompleted) {
+    const planning = normalizePlanning(safeJson(project?.stages?.PLANNING?.currentText || "{}"));
+    if (isPlanningSeeded(planning)) {
+      project.intakeCompleted = true;
+      saveState();
+    }
+  }
+  const hideIntake = !!project.intakeCompleted && !project.showIntakeOverride;
+  if (autoPane) autoPane.classList.toggle("hidden", hideIntake);
+  if (intakeLockedPane) intakeLockedPane.classList.toggle("hidden", !hideIntake);
   if (beginnerPane) beginnerPane.classList.add("hidden");
   if (advancedPane) advancedPane.classList.add("hidden");
+  if (reopenIntakeBtn) {
+    reopenIntakeBtn.onclick = () => {
+      const ok = confirm("重新開啟智慧入口可能覆蓋既有策略內容，確定繼續？");
+      if (!ok) return;
+      project.showIntakeOverride = true;
+      saveState();
+      renderWorkspace();
+      showToast("已重新開啟智慧入口（請確認再生成）", "warn");
+    };
+  }
   $("autoGenerateBtn").addEventListener("click", () => handleAutoGenerate(project));
   $("autoFillGapsBtn").addEventListener("click", () => handleAutoFillGaps(project, $("autoFillGapsBtn")));
   const hintsInput = $("autoFillHintsInput");
@@ -447,18 +535,151 @@ function renderPhaseWorkspace(project) {
     });
     const btns = document.createElement("div");
     btns.className = "actions";
+    const pilotStatus = document.createElement("span");
+    pilotStatus.className = "tag";
+    pilotStatus.textContent = `試寫狀態：${project.pilot.status || "待命"}`;
     const gen = document.createElement("button");
     gen.className = "btn secondary";
     gen.textContent = "AI 生成試寫章";
     gen.addEventListener("click", async () => {
       await withProjectTask(project, "PILOT 生成試寫章", async () => {
         const idea = (safeJson(project.stages.PLANNING.currentText || "{}")?.core_selling_points?.logline || "試寫章").toString();
-        const text = await callLLMText(`請根據此 logline 生成 800-1200 字試寫章：${idea}`, 0.8, false, 45000);
-        project.pilot.text = text || `【本地試寫】${idea}`;
+        const prompt = `請根據此 logline 生成可直接閱讀的試寫章正文。
+logline：${idea}
+要求：
+- 字數 900-1400
+- 必須有場景、行動、對話與章尾鉤子
+- 不要提綱、不要說明，僅輸出正文`;
+        project.pilot.status = "生成中（第 1/2 次）";
+        project.pilot.errorCode = "";
+        pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+        saveState();
+        const first = await callLLMWithMeta(prompt, 0.8, false, 60000);
+        let text = String(first.content || "").trim();
+        let errorCode = first.errorCode || "";
+        if (errorCode === "aborted") {
+          project.pilot.errorCode = "aborted";
+          project.pilot.status = "已終止（使用者取消）";
+          pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+          saveState();
+          return;
+        }
+        if (!isValidPilotText(text)) {
+          project.pilot.status = "重試中（第 2/2 次）";
+          pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+          saveState();
+          const second = await callLLMWithMeta(prompt, 0.8, false, 90000);
+          text = String(second.content || "").trim();
+          errorCode = second.errorCode || errorCode || "";
+        }
+        if (!isValidPilotText(text)) {
+          project.pilot.errorCode = errorCode || "short";
+          const reasonMap = {
+            timeout: "失敗（timeout）",
+            network: "失敗（network failed）",
+            aborted: "已終止（使用者取消）",
+            short: "失敗（empty or short）"
+          };
+          project.pilot.status = reasonMap[project.pilot.errorCode] || "失敗（empty or short）";
+          pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+          saveState();
+          showToast("試寫生成失敗：已保留原內容", "err");
+          return;
+        }
+        project.pilot.text = text;
+        project.pilot.errorCode = "";
+        project.pilot.status = `完成（${text.length} 字）`;
+        pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
         saveState();
         renderWorkspace();
       });
     });
+    const dissatisfaction = document.createElement("textarea");
+    dissatisfaction.placeholder = "作者不滿意點（例：語氣太平、衝突不足、人物動機不夠）";
+    dissatisfaction.value = project.pilot.dissatisfaction || "";
+    dissatisfaction.addEventListener("input", () => {
+      project.pilot.dissatisfaction = dissatisfaction.value;
+      saveState();
+    });
+    const rewriteTa = document.createElement("textarea");
+    rewriteTa.placeholder = "AI 重寫建議稿（先審核再套用）";
+    rewriteTa.value = project.pilot.rewriteCandidate || "";
+    rewriteTa.addEventListener("input", () => {
+      project.pilot.rewriteCandidate = rewriteTa.value;
+      saveState();
+    });
+    const rewriteBtns = document.createElement("div");
+    rewriteBtns.className = "actions";
+    const rewrite = document.createElement("button");
+    rewrite.className = "btn secondary";
+    rewrite.textContent = "AI 依不滿意點重寫";
+    rewrite.addEventListener("click", async () => {
+      await withProjectTask(project, "PILOT 依反饋重寫", async () => {
+        const source = String(project.pilot.text || "").trim();
+        const dissatisfactionText = String(project.pilot.dissatisfaction || "").trim();
+        if (!source) {
+          showToast("請先有一版試寫章內容", "warn");
+          return;
+        }
+        if (!dissatisfactionText) {
+          showToast("請先填作者不滿意點", "warn");
+          return;
+        }
+        const prompt = buildPilotRewritePrompt(project, source, dissatisfactionText);
+        project.pilot.status = "重寫中（第 1/2 次）";
+        pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+        saveState();
+        const first = await callLLMWithMeta(prompt, 0.7, false, 60000);
+        let text = String(first.content || "").trim();
+        let errorCode = first.errorCode || "";
+        if (!isValidPilotText(text) && errorCode !== "aborted") {
+          project.pilot.status = "重寫重試中（第 2/2 次）";
+          pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+          saveState();
+          const second = await callLLMWithMeta(prompt, 0.7, false, 90000);
+          text = String(second.content || "").trim();
+          errorCode = second.errorCode || errorCode || "";
+        }
+        if (errorCode === "aborted") {
+          project.pilot.errorCode = "aborted";
+          project.pilot.status = "已終止（使用者取消）";
+          pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+          saveState();
+          return;
+        }
+        if (!isValidPilotText(text)) {
+          project.pilot.errorCode = errorCode || "short";
+          project.pilot.status = "重寫失敗（請調整不滿意點後再試）";
+          pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+          saveState();
+          showToast("重寫失敗：已保留原稿", "err");
+          return;
+        }
+        project.pilot.rewriteCandidate = text;
+        project.pilot.errorCode = "";
+        project.pilot.status = `重寫完成（${text.length} 字）`;
+        pilotStatus.textContent = `試寫狀態：${project.pilot.status}`;
+        saveState();
+        renderWorkspace();
+      });
+    });
+    const applyRewrite = document.createElement("button");
+    applyRewrite.className = "btn";
+    applyRewrite.textContent = "套用重寫到試寫章";
+    applyRewrite.addEventListener("click", () => {
+      const next = String(project.pilot.rewriteCandidate || "").trim();
+      if (!next) {
+        showToast("目前沒有可套用的重寫稿", "warn");
+        return;
+      }
+      project.pilot.text = next;
+      project.pilot.status = `已套用重寫（${next.length} 字）`;
+      saveState();
+      renderWorkspace();
+      showToast("已套用重寫稿", "ok");
+    });
+    rewriteBtns.appendChild(rewrite);
+    rewriteBtns.appendChild(applyRewrite);
     const ok = document.createElement("button");
     ok.className = "btn";
     ok.textContent = "確認語氣，進入 PRODUCTION";
@@ -478,8 +699,12 @@ function renderPhaseWorkspace(project) {
     });
     btns.appendChild(doneEdit);
     btns.appendChild(gen);
+    btns.appendChild(pilotStatus);
     btns.appendChild(ok);
     card.appendChild(ta);
+    card.appendChild(dissatisfaction);
+    card.appendChild(rewriteTa);
+    card.appendChild(rewriteBtns);
     card.appendChild(btns);
     container.appendChild(card);
     return;
@@ -488,7 +713,7 @@ function renderPhaseWorkspace(project) {
   if (project.phase === "PRODUCTION") {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = "<h4>CHAPTER_PLAN + DRAFT</h4><div class=\"risk-detail\"><strong>你現在要做什麼</strong><div>先產生章節計畫並確認，再生成草稿。若不滿意可回策略層修正。</div><strong>按鈕順序</strong><div>1. AI 生成章節計畫 2. 我確認章節卡 3. AI 生成草稿 4. 進入 QA</div></div>";
+    card.innerHTML = "<h4>CHAPTER_PLAN + DRAFT</h4><div class=\"risk-detail\"><strong>你現在要做什麼</strong><div>先產生章節計畫並確認，再生成草稿。若不滿意可回策略層修正。</div><strong>按鈕順序</strong><div>1. AI 生成章節計畫 2. 作者確認章節卡 3. AI 生成草稿 4. 進入 QA</div></div>";
     const cpSummary = summarizeChapterPlan(project.stages.CHAPTER_PLAN.currentText || "");
     const draftSummary = (pickPlainText(safeJson(project.stages.DRAFT.currentText || "{}")) || "").slice(0, 320);
     if (!project.phaseEdit.PRODUCTION) {
@@ -521,13 +746,132 @@ function renderPhaseWorkspace(project) {
       container.appendChild(card);
       return;
     }
-    const cp = document.createElement("textarea");
-    cp.value = project.stages.CHAPTER_PLAN.currentText || "{\"chapters\":[]}";
-    cp.placeholder = "章節計畫 JSON";
-    cp.addEventListener("input", () => {
-      project.stages.CHAPTER_PLAN.currentText = cp.value;
+    const cpWrap = document.createElement("div");
+    cpWrap.className = "risk-detail";
+    cpWrap.innerHTML = "<strong>章節計畫編輯器（人類可讀）</strong><div class=\"chat-status\">建議直接改下面表格；底層會自動同步 JSON。</div>";
+    let rows = getChapterRowsFromPlan(project.stages.CHAPTER_PLAN.currentText || "{}");
+    if (!rows.length) {
+      rows = [{ chapter: 1, title: "", summary: "", note: "" }];
+    }
+    const rowsHost = document.createElement("div");
+    rowsHost.className = "plan-rows";
+    const renderRows = () => {
+      rowsHost.innerHTML = "";
+      rows.forEach((row, idx) => {
+        const line = document.createElement("div");
+        line.className = "plan-row";
+        const chapterInput = document.createElement("input");
+        chapterInput.type = "number";
+        chapterInput.min = "1";
+        chapterInput.value = String(row.chapter || idx + 1);
+        chapterInput.placeholder = "章";
+        chapterInput.addEventListener("input", () => {
+          rows[idx].chapter = Math.max(1, Number(chapterInput.value || idx + 1));
+          project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
+          saveState();
+        });
+        const titleInput = document.createElement("input");
+        titleInput.value = String(row.title || "");
+        titleInput.placeholder = "章節標題";
+        titleInput.addEventListener("input", () => {
+          rows[idx].title = titleInput.value;
+          project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
+          saveState();
+        });
+        const summaryInput = document.createElement("textarea");
+        summaryInput.value = String(row.summary || "");
+        summaryInput.placeholder = "本章摘要（發生什麼事、衝突、章尾鉤子）";
+        summaryInput.style.minHeight = "96px";
+        summaryInput.addEventListener("input", () => {
+          rows[idx].summary = summaryInput.value;
+          project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
+          saveState();
+        });
+        const noteInput = document.createElement("input");
+        noteInput.value = String(row.note || "");
+        noteInput.placeholder = "備註（可選）";
+        noteInput.addEventListener("input", () => {
+          rows[idx].note = noteInput.value;
+          project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
+          saveState();
+        });
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn secondary mini";
+        delBtn.textContent = "刪除";
+        delBtn.addEventListener("click", () => {
+          rows.splice(idx, 1);
+          if (!rows.length) rows.push({ chapter: 1, title: "", summary: "", note: "" });
+          project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
+          saveState();
+          renderRows();
+        });
+        line.appendChild(chapterInput);
+        line.appendChild(titleInput);
+        line.appendChild(delBtn);
+        line.appendChild(summaryInput);
+        line.appendChild(noteInput);
+        rowsHost.appendChild(line);
+      });
+    };
+    renderRows();
+    const cpActions = document.createElement("div");
+    cpActions.className = "actions";
+    const addRowBtn = document.createElement("button");
+    addRowBtn.className = "btn secondary mini";
+    addRowBtn.textContent = "新增章節列";
+    addRowBtn.addEventListener("click", () => {
+      const nextNo = Math.max(1, ...rows.map((r) => Number(r.chapter || 1))) + 1;
+      rows.push({ chapter: nextNo, title: "", summary: "", note: "" });
+      renderRows();
+      project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
       saveState();
     });
+    const sortBtn = document.createElement("button");
+    sortBtn.className = "btn secondary mini";
+    sortBtn.textContent = "依章號排序";
+    sortBtn.addEventListener("click", () => {
+      rows.sort((a, b) => Number(a.chapter || 0) - Number(b.chapter || 0));
+      renderRows();
+      project.stages.CHAPTER_PLAN.currentText = JSON.stringify(chapterRowsToPlanJson(rows), null, 2);
+      saveState();
+    });
+    cpActions.appendChild(addRowBtn);
+    cpActions.appendChild(sortBtn);
+    const rawToggleBtn = document.createElement("button");
+    rawToggleBtn.className = "btn secondary mini";
+    rawToggleBtn.textContent = "顯示原始 JSON";
+    const rawWrap = document.createElement("div");
+    rawWrap.className = "hidden";
+    const cpRaw = document.createElement("textarea");
+    cpRaw.value = prettyJsonText(project.stages.CHAPTER_PLAN.currentText || "{}");
+    cpRaw.placeholder = "原始章節計畫 JSON（進階）";
+    const applyRawBtn = document.createElement("button");
+    applyRawBtn.className = "btn secondary mini";
+    applyRawBtn.textContent = "套用原始 JSON";
+    applyRawBtn.addEventListener("click", () => {
+      const parsed = safeJson(cpRaw.value || "{}");
+      if (parsed?._error) {
+        showToast("JSON 格式錯誤，請修正後再套用", "err");
+        return;
+      }
+      project.stages.CHAPTER_PLAN.currentText = JSON.stringify(parsed, null, 2);
+      rows = getChapterRowsFromPlan(project.stages.CHAPTER_PLAN.currentText || "{}");
+      if (!rows.length) rows = [{ chapter: 1, title: "", summary: "", note: "" }];
+      saveState();
+      renderRows();
+      showToast("已套用原始 JSON", "ok");
+    });
+    rawToggleBtn.addEventListener("click", () => {
+      rawWrap.classList.toggle("hidden");
+      rawToggleBtn.textContent = rawWrap.classList.contains("hidden") ? "顯示原始 JSON" : "隱藏原始 JSON";
+      cpRaw.value = prettyJsonText(project.stages.CHAPTER_PLAN.currentText || "{}");
+    });
+    rawWrap.appendChild(cpRaw);
+    rawWrap.appendChild(applyRawBtn);
+    cpActions.appendChild(rawToggleBtn);
+    cpWrap.appendChild(cpActions);
+    cpWrap.appendChild(rowsHost);
+    cpWrap.appendChild(rawWrap);
     const dr = document.createElement("textarea");
     dr.value = pickPlainText(safeJson(project.stages.DRAFT.currentText || "{}"));
     dr.placeholder = "章節草稿";
@@ -544,7 +888,7 @@ function renderPhaseWorkspace(project) {
       await withProjectTask(project, "PRODUCTION 生成章節計畫", async () => {
         const outline = project.stages.OUTLINE.currentText || "{}";
         const text = await callLLMText(`請根據 outline 生成 chapter plan JSON: ${outline}`, 0.5, true, 45000);
-        project.stages.CHAPTER_PLAN.currentText = text || cp.value;
+        project.stages.CHAPTER_PLAN.currentText = prettyJsonText(text || project.stages.CHAPTER_PLAN.currentText || "{}");
         project.production.chapterPlanConfirmed = false;
         saveState();
         renderWorkspace();
@@ -552,7 +896,7 @@ function renderPhaseWorkspace(project) {
     });
     const confirmPlan = document.createElement("button");
     confirmPlan.className = "btn secondary";
-    confirmPlan.textContent = project.production.chapterPlanConfirmed ? "2) 已確認章節卡" : "2) 我確認章節卡";
+    confirmPlan.textContent = project.production.chapterPlanConfirmed ? "2) 作者已確認章節卡" : "2) 作者確認章節卡";
     confirmPlan.addEventListener("click", () => {
       const ok = summarizeChapterPlan(project.stages.CHAPTER_PLAN.currentText || "") !== "尚無章節計畫";
       if (!ok) {
@@ -594,60 +938,206 @@ function renderPhaseWorkspace(project) {
       }
       await withProjectTask(project, "PRODUCTION 生成草稿", async () => {
         const chapterNo = Math.max(1, Number(project.production.targetChapterNo || 1));
-        const card = extractChapterCard(project.stages.CHAPTER_PLAN.currentText || "{}", chapterNo);
-        if (!card) {
-          project.production.draftErrorCode = "short";
-          project.production.draftStatus = "失敗（章節卡格式無法解析）";
-          saveState();
-          showToast("章節計畫格式無法解析，請先確認章節計畫", "err");
-          return;
-        }
-        project.production.draftStatus = "生成中（第 1/2 次）";
+        project.production.draftStatus = `生成中（第${chapterNo}章）`;
         project.production.draftErrorCode = "";
+        project.production.run.currentChapterNo = chapterNo;
+        project.production.run.running = true;
+        syncProductionRunProgress(project, chapterNo, chapterNo);
         draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
-        pushDebugLog("draft.status", { status: project.production.draftStatus, chapterNo });
         saveState();
-        const prompt = buildDraftPrompt({
-          chapterCard: card,
-          strategyBrief: buildStrategyBrief(project),
-          constraints: { minWords: 800, maxWords: 1400 }
+        const existing = ensureChapterDraftRecord(project, chapterNo, 3);
+        const willResume = !existing.done && (existing.currentChunk || 0) > 0;
+        const res = await generateDraftForChapter(project, chapterNo, {
+          targetChunks: existing.targetChunks || 3,
+          resume: true,
+          onChunk: (idx, total, words) => {
+            project.production.draftStatus = `第${chapterNo}章 ${willResume ? "續跑" : "生成"}中（段落 ${idx}/${total}，累計 ${words} 字）`;
+            draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+            saveState();
+          }
         });
-        let first = await callLLMWithMeta(prompt, 0.8, false, 90000);
-        let text = first.content;
-        let errorCode = first.errorCode || "";
-        if (!isValidDraftText(text)) {
-          project.production.draftStatus = "重試中（第 2/2 次）";
-          pushDebugLog("draft.status", { status: project.production.draftStatus, chapterNo });
+        if (!res.ok) {
+          project.production.draftErrorCode = res.errorCode || "short";
+          project.production.draftStatus = res.statusText;
+          project.production.run.running = false;
+          syncProductionRunProgress(project, chapterNo, chapterNo);
           draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
-          saveState();
-          const second = await callLLMWithMeta(prompt, 0.8, false, 120000);
-          text = second.content;
-          errorCode = second.errorCode || errorCode || "";
-        }
-        if (!isValidDraftText(text)) {
-          project.production.draftErrorCode = errorCode || "short";
-          const reasonMap = {
-            timeout: "失敗（timeout）",
-            network: "失敗（network failed）",
-            short: "失敗（empty or short）"
-          };
-          project.production.draftStatus = reasonMap[project.production.draftErrorCode] || "失敗（empty or short）";
-          draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
-          pushDebugLog("draft.status", { status: project.production.draftStatus, errorCode: project.production.draftErrorCode, chapterNo }, "err");
-          pushDebugLog("draft.generate.failed", { reason: "empty_or_short_after_retry", errorCode: project.production.draftErrorCode, chapterNo }, "err");
           saveState();
           showToast("草稿生成失敗：請重試或檢查 API/網路", "err");
           return;
         }
-        project.stages.DRAFT.currentText = JSON.stringify({ content: String(text).trim() });
+        setChapterDraft(project, chapterNo, res.text, "done", "");
+        project.stages.DRAFT.currentText = JSON.stringify({ content: res.text });
         project.production.draftErrorCode = "";
-        project.production.draftStatus = `完成（${String(text).trim().length} 字）`;
+        project.production.run.running = false;
+        syncProductionRunProgress(project, chapterNo, chapterNo);
+        project.production.draftStatus = res.statusText;
         draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
-        pushDebugLog("draft.status", { status: project.production.draftStatus, chapterNo });
         saveState();
         renderWorkspace();
       });
     });
+    const batchWrap = document.createElement("label");
+    batchWrap.className = "tag";
+    batchWrap.textContent = "批次章節：";
+    const batchFrom = document.createElement("input");
+    batchFrom.type = "number";
+    batchFrom.min = "1";
+    batchFrom.step = "1";
+    batchFrom.value = String(project.production.batchFrom || 1);
+    batchFrom.style.width = "64px";
+    batchFrom.style.marginLeft = "6px";
+    const sep = document.createElement("span");
+    sep.textContent = " ~ ";
+    sep.style.margin = "0 4px";
+    const batchTo = document.createElement("input");
+    batchTo.type = "number";
+    batchTo.min = "1";
+    batchTo.step = "1";
+    batchTo.value = String(project.production.batchTo || 5);
+    batchTo.style.width = "64px";
+    batchTo.addEventListener("input", () => {
+      project.production.batchTo = Math.max(1, Number(batchTo.value || 1));
+      saveState();
+    });
+    batchFrom.addEventListener("input", () => {
+      project.production.batchFrom = Math.max(1, Number(batchFrom.value || 1));
+      saveState();
+    });
+    batchWrap.appendChild(batchFrom);
+    batchWrap.appendChild(sep);
+    batchWrap.appendChild(batchTo);
+    const batchBtn = document.createElement("button");
+    batchBtn.className = "btn secondary";
+    batchBtn.textContent = "AI 批次生成章節";
+    batchBtn.addEventListener("click", async () => {
+      if (!project.production.chapterPlanConfirmed) {
+        showToast("請先確認章節卡", "warn");
+        return;
+      }
+      await withProjectTask(project, "PRODUCTION 批次生成草稿", async () => {
+        const from = Math.max(1, Number(project.production.batchFrom || 1));
+        const to = Math.max(from, Number(project.production.batchTo || from));
+        project.production.run.running = true;
+        project.production.run.currentChapterNo = from;
+        syncProductionRunProgress(project, from, to);
+        saveState();
+        let okCount = 0;
+        let failCount = 0;
+        for (let chapterNo = from; chapterNo <= to; chapterNo += 1) {
+          if (project.runtime?.abortRequested) {
+            project.production.draftStatus = "已終止（使用者取消）";
+            project.production.run.running = false;
+            saveState();
+            break;
+          }
+          project.production.run.currentChapterNo = chapterNo;
+          project.production.run.running = true;
+          project.production.draftStatus = `批次生成中：第 ${chapterNo} 章`;
+          draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+          saveState();
+          const res = await generateDraftForChapter(project, chapterNo, {
+            targetChunks: 3,
+            resume: true,
+            onChunk: (idx, total, words) => {
+              project.production.draftStatus = `第${chapterNo}章 生成中（段落 ${idx}/${total}，累計 ${words} 字）`;
+              draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+              saveState();
+            }
+          });
+          if (res.ok) {
+            setChapterDraft(project, chapterNo, res.text, "done", "");
+            okCount += 1;
+            syncProductionRunProgress(project, from, to);
+          } else {
+            const rec = ensureChapterDraftRecord(project, chapterNo, 3);
+            rec.status = "failed";
+            rec.errorCode = res.errorCode || "short";
+            rec.updatedAt = new Date().toISOString();
+            failCount += 1;
+            syncProductionRunProgress(project, from, to);
+            if (res.errorCode === "aborted") break;
+          }
+        }
+        project.production.run.running = false;
+        syncProductionRunProgress(project, from, to);
+        project.stages.DRAFT.currentText = JSON.stringify({ content: project.chapterDrafts?.[String(from)]?.text || pickPlainText(safeJson(project.stages.DRAFT.currentText || "{}")) });
+        project.production.draftStatus = `批次完成：成功 ${okCount} 章，失敗 ${failCount} 章`;
+        draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+        saveState();
+        renderWorkspace();
+      });
+    });
+    const resumeBtn = document.createElement("button");
+    resumeBtn.className = "btn secondary";
+    resumeBtn.textContent = "繼續未完成章節";
+    resumeBtn.addEventListener("click", async () => {
+      if (!project.production.chapterPlanConfirmed) {
+        showToast("請先確認章節卡", "warn");
+        return;
+      }
+      await withProjectTask(project, "PRODUCTION 繼續未完成章節", async () => {
+        const from = Math.max(1, Number(project.production.batchFrom || 1));
+        const to = Math.max(from, Number(project.production.batchTo || from));
+        project.production.run.running = true;
+        syncProductionRunProgress(project, from, to);
+        saveState();
+        let resumed = 0;
+        for (let chapterNo = from; chapterNo <= to; chapterNo += 1) {
+          const rec = ensureChapterDraftRecord(project, chapterNo, 3);
+          if (rec.done) continue;
+          project.production.run.currentChapterNo = chapterNo;
+          project.production.draftStatus = `續跑中：第 ${chapterNo} 章`;
+          draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+          saveState();
+          const res = await generateDraftForChapter(project, chapterNo, {
+            targetChunks: rec.targetChunks || 3,
+            resume: true,
+            onChunk: (idx, total, words) => {
+              project.production.draftStatus = `第${chapterNo}章 續跑（段落 ${idx}/${total}，累計 ${words} 字）`;
+              draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+              saveState();
+            }
+          });
+          if (res.ok) {
+            setChapterDraft(project, chapterNo, res.text, "done", "");
+            resumed += 1;
+            syncProductionRunProgress(project, from, to);
+          } else if (res.errorCode === "aborted") {
+            break;
+          } else {
+            syncProductionRunProgress(project, from, to);
+          }
+        }
+        project.production.run.running = false;
+        syncProductionRunProgress(project, from, to);
+        project.production.draftStatus = `續跑完成：完成 ${resumed} 章`;
+        draftStatus.textContent = `草稿狀態：${project.production.draftStatus}`;
+        saveState();
+        renderWorkspace();
+      });
+    });
+    const currentChapterPanel = document.createElement("div");
+    currentChapterPanel.className = "risk-detail";
+    const currentNo = Number(project.production.run?.currentChapterNo || project.production.batchFrom || 1);
+    const currentRec = (project.chapterDrafts && project.chapterDrafts[String(currentNo)]) || { status: "idle", chunks: [], text: "" };
+    currentChapterPanel.innerHTML = `<strong>目前生成章節</strong>
+      <div>目前生成第 ${currentNo} 章（狀態：${escapeHtml(currentRec.status || "idle")}）</div>
+      <div class="chat-status">${escapeHtml(previewText(currentRec.text || (currentRec.chunks || []).join("\n\n") || "尚無內容", 240))}</div>`;
+    const chapterListPreview = document.createElement("div");
+    chapterListPreview.className = "risk-detail";
+    const entries = getSortedChapterDraftEntries(project);
+    const fromRange = Math.max(1, Number(project.production.batchFrom || 1));
+    const toRange = Math.max(fromRange, Number(project.production.batchTo || fromRange));
+    const totalRange = Math.max(0, toRange - fromRange + 1);
+    const completedRange = countCompletedChaptersInRange(project, fromRange, toRange);
+    const failedRange = Object.entries(project.chapterDrafts || {})
+      .map(([k, v]) => ({ chapterNo: Number(k), rec: v || {} }))
+      .filter((x) => Number.isFinite(x.chapterNo) && x.chapterNo >= fromRange && x.chapterNo <= toRange && String(x.rec.status || "") === "failed")
+      .length;
+    chapterListPreview.innerHTML = `<strong>總章節儲存區</strong>
+      <div>${entries.length ? entries.map((x) => `第${x.chapterNo}章(${x.done ? "完成" : `段落${x.currentChunk || 0}/${x.targetChunks || 3}`})`).join("、") : "尚無章節草稿"}</div>
+      <div class="chat-status">進度：已生成章節數 ${completedRange} / ${totalRange}（失敗 ${failedRange}）</div>`;
     const backWrap = document.createElement("div");
     backWrap.className = "risk-detail";
     backWrap.innerHTML = "<strong>不滿意回策略層</strong><div>請填寫不滿意點，AI 會提示該改哪些策略欄位並可一鍵跳回。</div>";
@@ -708,12 +1198,17 @@ function renderPhaseWorkspace(project) {
     actions.appendChild(genPlan);
     actions.appendChild(confirmPlan);
     actions.appendChild(chapterPickerWrap);
+    actions.appendChild(batchWrap);
+    actions.appendChild(batchBtn);
+    actions.appendChild(resumeBtn);
     actions.appendChild(genDraft);
     actions.appendChild(draftStatus);
     actions.appendChild(doneEdit);
     actions.appendChild(toQa);
-    card.appendChild(cp);
+    card.appendChild(cpWrap);
     card.appendChild(dr);
+    card.appendChild(currentChapterPanel);
+    card.appendChild(chapterListPreview);
     backWrap.appendChild(dissatisfaction);
     backWrap.appendChild(feedbackBox);
     const ba = document.createElement("div");
@@ -731,10 +1226,11 @@ function renderPhaseWorkspace(project) {
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = "<h4>QA 報告</h4><div class=\"risk-detail\"><strong>你現在要做什麼</strong><div>檢查衝突與節奏，確認修訂建議後再交付。</div></div>";
+    const qaObj = parseQaStageObject(project);
     if (!project.phaseEdit.QA) {
       const pv = document.createElement("pre");
       pv.className = "debug-pre";
-      pv.textContent = (pickPlainText(safeJson(project.stages.QA.currentText || "{}")) || "尚無 QA 建議").slice(0, 1600);
+      pv.textContent = JSON.stringify(qaObj, null, 2).slice(0, 2600) || "尚無 QA 建議";
       card.appendChild(pv);
       const va = document.createElement("div");
       va.className = "actions";
@@ -761,11 +1257,167 @@ function renderPhaseWorkspace(project) {
       container.appendChild(card);
       return;
     }
+    const sourceWrap = document.createElement("div");
+    sourceWrap.className = "risk-detail";
+    const mustKeepSource = qaObj.must_keep_rules.length ? "來源：Bible.world_rules.hard_rules（或 QA 模型回覆）" : "來源：目前無硬規則，僅一般一致性要求";
+    sourceWrap.innerHTML = `<strong>報告來源</strong><div>source: ${escapeHtml(qaObj.source || "unknown")}</div><div>${escapeHtml(mustKeepSource)}</div>`;
+    card.appendChild(sourceWrap);
+
+    const scoreWrap = document.createElement("div");
+    scoreWrap.className = "risk-detail";
+    scoreWrap.innerHTML = `
+      <strong>分數</strong>
+      <ul>
+        <li>一致性 consistency：${Number(qaObj.scores?.consistency || 0)}</li>
+        <li>動機 motivation：${Number(qaObj.scores?.motivation || 0)}</li>
+        <li>節奏 pacing：${Number(qaObj.scores?.pacing || 0)}</li>
+        <li>鉤子 hook：${Number(qaObj.scores?.hook || 0)}</li>
+      </ul>
+      <div>${escapeHtml(qaObj.qa_summary || "")}</div>
+    `;
+    card.appendChild(scoreWrap);
+
+    const issuesWrap = document.createElement("div");
+    issuesWrap.className = "risk-detail";
+    issuesWrap.innerHTML = "<strong>Issue 清單（可逐條決策）</strong>";
+    const issueList = document.createElement("div");
+    const issues = Array.isArray(qaObj.issues) ? qaObj.issues : [];
+    if (!issues.length) {
+      const empty = document.createElement("div");
+      empty.className = "chat-status";
+      empty.textContent = "尚無可操作 issue，請先按「AI 產生 QA 建議」。";
+      issueList.appendChild(empty);
+    }
+    issues.forEach((issue, idx) => {
+      const key = String(idx);
+      const decision = project.qaDecisions?.[key] || { action: "", note: "" };
+      const row = document.createElement("div");
+      row.className = "card";
+      row.style.marginTop = "8px";
+      row.innerHTML = `
+        <div><strong>#${idx + 1} [${escapeHtml(issue.severity)}] ${escapeHtml(issue.title)}</strong></div>
+        <div><small>證據：${escapeHtml(issue.evidence)}</small></div>
+        <div><small>AI 建議：${escapeHtml(issue.suggestion)}</small></div>
+      `;
+      const note = document.createElement("textarea");
+      note.placeholder = "作者補充（可選）：你想怎麼改或為何忽略";
+      note.value = String(decision.note || "");
+      note.addEventListener("input", () => {
+        project.qaDecisions[key] = { ...(project.qaDecisions[key] || {}), note: note.value };
+        saveState();
+      });
+      const rowActions = document.createElement("div");
+      rowActions.className = "actions";
+      const adoptBtn = document.createElement("button");
+      adoptBtn.className = "btn";
+      adoptBtn.textContent = decision.action === "adopt" ? "已採納" : "採納此項";
+      adoptBtn.addEventListener("click", () => {
+        project.qaDecisions[key] = { ...(project.qaDecisions[key] || {}), action: "adopt" };
+        saveState();
+        renderWorkspace();
+      });
+      const ignoreBtn = document.createElement("button");
+      ignoreBtn.className = "btn secondary";
+      ignoreBtn.textContent = decision.action === "ignore" ? "已忽略" : "忽略此項";
+      ignoreBtn.addEventListener("click", () => {
+        project.qaDecisions[key] = { ...(project.qaDecisions[key] || {}), action: "ignore" };
+        saveState();
+        renderWorkspace();
+      });
+      const clearBtn = document.createElement("button");
+      clearBtn.className = "btn secondary";
+      clearBtn.textContent = "清除決策";
+      clearBtn.addEventListener("click", () => {
+        project.qaDecisions[key] = { ...(project.qaDecisions[key] || {}), action: "" };
+        saveState();
+        renderWorkspace();
+      });
+      rowActions.appendChild(adoptBtn);
+      rowActions.appendChild(ignoreBtn);
+      rowActions.appendChild(clearBtn);
+      row.appendChild(note);
+      row.appendChild(rowActions);
+      issueList.appendChild(row);
+    });
+    issuesWrap.appendChild(issueList);
+    card.appendChild(issuesWrap);
+
+    const rewriteWrap = document.createElement("div");
+    rewriteWrap.className = "risk-detail";
+    rewriteWrap.innerHTML = "<strong>下一步：AI 先改稿，你再審核</strong>";
+    const adoptedIssues = getQaSelectedIssues(project, qaObj, "adopt");
+    const adoptedSummary = document.createElement("div");
+    adoptedSummary.className = "chat-status";
+    adoptedSummary.textContent = `已採納 ${adoptedIssues.length} 項 issue，可生成修稿草案。`;
+    const rewriteTa = document.createElement("textarea");
+    rewriteTa.placeholder = "AI 修稿草案會出現在這裡，你可再編輯後套用";
+    rewriteTa.value = String(project.qaRewriteCandidate || "");
+    rewriteTa.addEventListener("input", () => {
+      project.qaRewriteCandidate = rewriteTa.value;
+      saveState();
+    });
+    const rewriteActions = document.createElement("div");
+    rewriteActions.className = "actions";
+    const genRewriteBtn = document.createElement("button");
+    genRewriteBtn.className = "btn";
+    genRewriteBtn.textContent = "AI 生成修稿草案";
+    genRewriteBtn.addEventListener("click", async () => {
+      await withProjectTask(project, "QA 生成修稿草案", async () => {
+        const draftObj = safeJson(project.stages.DRAFT.currentText || "{}");
+        const currentDraft = pickPlainText(draftObj);
+        const adopted = getQaSelectedIssues(project, qaObj, "adopt");
+        if (!currentDraft.trim()) {
+          showToast("目前沒有可重寫的草稿內容", "warn");
+          return;
+        }
+        if (!adopted.length) {
+          showToast("請先至少採納 1 條 issue", "warn");
+          return;
+        }
+        const next = await buildQaRewriteCandidate(project, qaObj, adopted, currentDraft);
+        project.qaRewriteCandidate = next;
+        saveState();
+        renderWorkspace();
+        showToast("已產生修稿草案，請先審核再套用", "ok");
+      });
+    });
+    const applyRewriteBtn = document.createElement("button");
+    applyRewriteBtn.className = "btn secondary";
+    applyRewriteBtn.textContent = "套用到 DRAFT";
+    applyRewriteBtn.addEventListener("click", () => {
+      const next = String(project.qaRewriteCandidate || "").trim();
+      if (!next) {
+        showToast("目前沒有可套用的修稿草案", "warn");
+        return;
+      }
+      const ok = confirm("確定以修稿草案覆寫目前 DRAFT？");
+      if (!ok) return;
+      project.stages.DRAFT.currentText = JSON.stringify({ content: next });
+      saveVersion(project);
+      saveState();
+      showToast("已套用到 DRAFT", "ok");
+    });
+    const clearRewriteBtn = document.createElement("button");
+    clearRewriteBtn.className = "btn secondary";
+    clearRewriteBtn.textContent = "清空修稿草案";
+    clearRewriteBtn.addEventListener("click", () => {
+      project.qaRewriteCandidate = "";
+      saveState();
+      renderWorkspace();
+    });
+    rewriteActions.appendChild(genRewriteBtn);
+    rewriteActions.appendChild(applyRewriteBtn);
+    rewriteActions.appendChild(clearRewriteBtn);
+    rewriteWrap.appendChild(adoptedSummary);
+    rewriteWrap.appendChild(rewriteTa);
+    rewriteWrap.appendChild(rewriteActions);
+    card.appendChild(rewriteWrap);
+
     const qaTa = document.createElement("textarea");
-    qaTa.value = pickPlainText(safeJson(project.stages.QA.currentText || "{}"));
-    qaTa.placeholder = "QA 結果";
+    qaTa.value = JSON.stringify(qaObj, null, 2);
+    qaTa.placeholder = "QA 原始 JSON（可人工修正）";
     qaTa.addEventListener("input", () => {
-      project.stages.QA.currentText = JSON.stringify({ content: qaTa.value });
+      project.stages.QA.currentText = qaTa.value;
       saveState();
     });
     const actions = document.createElement("div");
@@ -838,6 +1490,39 @@ function renderPhaseWorkspace(project) {
     downloadText(`${slug(project.title)}_draft.txt`, txt, "text/plain");
     showToast("已導出 TXT", "ok");
   });
+  const expBookTxt = document.createElement("button");
+  expBookTxt.className = "btn secondary";
+  expBookTxt.textContent = "導出整本 TXT（已生成章節）";
+  expBookTxt.addEventListener("click", () => {
+    const entries = getSortedChapterDraftEntries(project).filter((x) => x.done);
+    if (!entries.length) {
+      showToast("尚無可導出的章節草稿", "warn");
+      return;
+    }
+    const lines = [];
+    entries.forEach((it) => {
+      lines.push(`# 第${it.chapterNo}章`);
+      lines.push("");
+      lines.push(String(it.text || "").trim());
+      lines.push("");
+    });
+    downloadText(`${slug(project.title)}_book.txt`, lines.join("\n"), "text/plain");
+    showToast(`已導出整本 TXT（${entries.length} 章）`, "ok");
+  });
+  const expChaptersTxt = document.createElement("button");
+  expChaptersTxt.className = "btn secondary";
+  expChaptersTxt.textContent = "導出分章 TXT";
+  expChaptersTxt.addEventListener("click", () => {
+    const entries = getSortedChapterDraftEntries(project).filter((x) => x.done);
+    if (!entries.length) {
+      showToast("尚無可導出的章節草稿", "warn");
+      return;
+    }
+    entries.forEach((it) => {
+      downloadText(`${slug(project.title)}_chapter_${it.chapterNo}.txt`, String(it.text || "").trim(), "text/plain");
+    });
+    showToast(`已導出分章 TXT（${entries.length} 章）`, "ok");
+  });
   const doneEdit = document.createElement("button");
   doneEdit.className = "btn secondary";
   doneEdit.textContent = "完成編輯（鎖定本頁）";
@@ -848,6 +1533,8 @@ function renderPhaseWorkspace(project) {
   });
   actions.appendChild(expJson);
   actions.appendChild(expTxt);
+  actions.appendChild(expBookTxt);
+  actions.appendChild(expChaptersTxt);
   actions.appendChild(doneEdit);
   card.appendChild(actions);
   container.appendChild(card);
@@ -856,13 +1543,220 @@ function renderPhaseWorkspace(project) {
 function summarizeChapterPlan(raw) {
   const parsed = safeJson(raw || "{}");
   if (parsed._error) return "尚無章節計畫";
-  if (Array.isArray(parsed.chapters) && parsed.chapters.length) {
-    const first = parsed.chapters[0];
-    return `共 ${parsed.chapters.length} 章，首章：${first?.title || "未命名"}`;
+  const items = collectChapterItems(parsed);
+  if (items.length) {
+    const first = items[0];
+    return `共 ${items.length} 章，首章：${first?.title || "未命名"}`;
   }
   const text = String(raw || "").trim();
   if (!text) return "尚無章節計畫";
   return `已有章節計畫文字（${text.length} 字）`;
+}
+
+function getChapterRowsFromPlan(raw) {
+  const parsed = safeJson(raw || "{}");
+  if (parsed._error) return [];
+  const items = collectChapterItems(parsed);
+  return items.map((it) => ({
+    chapter: Number(it.chapterNo || 0) || 1,
+    title: String(it.title || "").trim(),
+    summary: String(it.summary || "").trim(),
+    note: String(it.note || "").trim()
+  }));
+}
+
+function chapterRowsToPlanJson(rows) {
+  const normalized = (Array.isArray(rows) ? rows : [])
+    .map((r) => ({
+      chapter_number: Math.max(1, Number(r.chapter || 1)),
+      title: String(r.title || "").trim(),
+      summary: String(r.summary || "").trim(),
+      note: String(r.note || "").trim()
+    }))
+    .filter((r) => r.title || r.summary)
+    .sort((a, b) => a.chapter_number - b.chapter_number);
+  return {
+    chapter_plan: {
+      chapters: normalized
+    }
+  };
+}
+
+function getSortedChapterDraftEntries(project) {
+  const map = project?.chapterDrafts && typeof project.chapterDrafts === "object" ? project.chapterDrafts : {};
+  return Object.entries(map)
+    .map(([k, v]) => ({ chapterNo: Number(k), ...(v || {}) }))
+    .filter((x) => Number.isFinite(x.chapterNo) && x.chapterNo > 0 && (String(x.text || "").trim() || (Array.isArray(x.chunks) && x.chunks.length)))
+    .sort((a, b) => a.chapterNo - b.chapterNo);
+}
+
+function countCompletedChaptersInRange(project, from, to) {
+  const entries = getSortedChapterDraftEntries(project);
+  return entries.filter((x) => x.done && x.chapterNo >= from && x.chapterNo <= to).length;
+}
+
+function syncProductionRunProgress(project, from, to) {
+  ensureProjectDefaults(project);
+  const total = Math.max(0, to - from + 1);
+  const completed = countCompletedChaptersInRange(project, from, to);
+  const failed = Object.entries(project.chapterDrafts || {})
+    .map(([k, v]) => ({ chapterNo: Number(k), rec: v || {} }))
+    .filter((x) => Number.isFinite(x.chapterNo) && x.chapterNo >= from && x.chapterNo <= to && String(x.rec.status || "") === "failed")
+    .length;
+  project.production.run.from = from;
+  project.production.run.to = to;
+  project.production.run.total = total;
+  project.production.run.completed = completed;
+  project.production.run.failed = failed;
+  project.production.run.updatedAt = new Date().toISOString();
+}
+
+function ensureChapterDraftRecord(project, chapterNo, targetChunks = 3) {
+  if (!project.chapterDrafts || typeof project.chapterDrafts !== "object") project.chapterDrafts = {};
+  const key = String(chapterNo);
+  const cur = project.chapterDrafts[key] && typeof project.chapterDrafts[key] === "object" ? project.chapterDrafts[key] : {};
+  const next = {
+    text: String(cur.text || ""),
+    status: String(cur.status || "idle"),
+    errorCode: String(cur.errorCode || ""),
+    updatedAt: cur.updatedAt || new Date().toISOString(),
+    chunks: Array.isArray(cur.chunks) ? cur.chunks : [],
+    targetChunks: Number.isFinite(cur.targetChunks) ? Number(cur.targetChunks) : Math.max(1, Number(targetChunks || 3)),
+    currentChunk: Number.isFinite(cur.currentChunk) ? Number(cur.currentChunk) : (Array.isArray(cur.chunks) ? cur.chunks.length : 0),
+    done: !!cur.done
+  };
+  project.chapterDrafts[key] = next;
+  return next;
+}
+
+function setChapterDraft(project, chapterNo, text, status = "done", errorCode = "") {
+  if (!project.chapterDrafts || typeof project.chapterDrafts !== "object") project.chapterDrafts = {};
+  const rec = ensureChapterDraftRecord(project, chapterNo, 3);
+  rec.text = String(text || "");
+  rec.status = String(status || "done");
+  rec.errorCode = String(errorCode || "");
+  rec.updatedAt = new Date().toISOString();
+  rec.done = rec.status === "done";
+  if (rec.done && !Array.isArray(rec.chunks)) rec.chunks = [];
+}
+
+function buildChunkPrompt({ chapterCard, strategyBrief, existingText, chunkIndex, targetChunks }) {
+  const rules = (strategyBrief?.hardRules || []).map((x, i) => `${i + 1}. ${x}`).join("\n") || "（無）";
+  return `你是小說代筆助手。請續寫本章的下一段正文。
+
+章節資訊：
+- 章號：${chapterCard.chapterNo}
+- 標題：${chapterCard.title}
+- 章節摘要：${chapterCard.summary}
+- 目前段落：第 ${chunkIndex}/${targetChunks} 段
+
+策略摘要：
+- logline：${strategyBrief?.logline || "（無）"}
+- 風格要求：${strategyBrief?.styleDo || "（無）"}
+- 必守硬規則：
+${rules}
+
+已完成正文（供你續寫，不可重複）：
+${String(existingText || "").slice(-4500) || "（尚無）"}
+
+輸出要求：
+- 只輸出「本次新增段落」正文，不要重覆前文
+- 目標 600-900 字
+- 需推進事件，不要空轉`;
+}
+
+async function generateChunkText(prompt) {
+  const first = await callLLMWithMeta(prompt, 0.8, false, 90000);
+  let text = String(first.content || "").trim();
+  let errorCode = first.errorCode || "";
+  if (errorCode === "aborted") return { ok: false, errorCode, text: "" };
+  if (!isValidDraftChunk(text)) {
+    const second = await callLLMWithMeta(prompt, 0.8, false, 120000);
+    text = String(second.content || "").trim();
+    errorCode = second.errorCode || errorCode || "";
+  }
+  if (!isValidDraftChunk(text)) return { ok: false, errorCode: errorCode || "short", text: "" };
+  return { ok: true, errorCode: "", text };
+}
+
+async function generateDraftForChapter(project, chapterNo, opts = {}) {
+  const targetChunks = Math.max(1, Number(opts.targetChunks || 3));
+  const resume = opts.resume !== false;
+  const card = extractChapterCard(project.stages.CHAPTER_PLAN.currentText || "{}", chapterNo);
+  if (!card) {
+    return { ok: false, errorCode: "short", statusText: "失敗（章節卡格式無法解析）", text: "" };
+  }
+  const rec = ensureChapterDraftRecord(project, chapterNo, targetChunks);
+  pushDebugLog("draft.chapter.start", {
+    chapterNo,
+    resume,
+    currentChunk: rec.currentChunk || 0,
+    targetChunks: rec.targetChunks || targetChunks
+  });
+  if (!resume) {
+    rec.chunks = [];
+    rec.currentChunk = 0;
+    rec.done = false;
+    rec.text = "";
+    rec.errorCode = "";
+    rec.status = "generating";
+  }
+  rec.targetChunks = targetChunks;
+  while (rec.currentChunk < rec.targetChunks) {
+    if (project.runtime?.abortRequested) {
+      rec.status = "aborted";
+      rec.errorCode = "aborted";
+      rec.updatedAt = new Date().toISOString();
+      return { ok: false, errorCode: "aborted", statusText: "已終止（使用者取消）", text: rec.text || "" };
+    }
+    const chunkIndex = rec.currentChunk + 1;
+    const existingText = (rec.chunks || []).join("\n\n");
+    const prompt = buildChunkPrompt({
+      chapterCard: card,
+      strategyBrief: buildStrategyBrief(project),
+      existingText,
+      chunkIndex,
+      targetChunks: rec.targetChunks
+    });
+    const chunkRes = await generateChunkText(prompt);
+    if (!chunkRes.ok) {
+      rec.status = "failed";
+      rec.errorCode = chunkRes.errorCode || "short";
+      rec.updatedAt = new Date().toISOString();
+      const reasonMap = {
+        timeout: "失敗（timeout）",
+        network: "失敗（network failed）",
+        aborted: "已終止（使用者取消）",
+        short: "失敗（empty or short）"
+      };
+      return {
+        ok: false,
+        errorCode: rec.errorCode,
+        statusText: reasonMap[rec.errorCode] || "失敗（empty or short）",
+        text: existingText
+      };
+    }
+    rec.chunks.push(chunkRes.text);
+    rec.currentChunk += 1;
+    rec.text = rec.chunks.join("\n\n");
+    rec.status = "generating";
+    rec.errorCode = "";
+    rec.updatedAt = new Date().toISOString();
+    if (typeof opts.onChunk === "function") opts.onChunk(rec.currentChunk, rec.targetChunks, rec.text.length);
+    pushDebugLog("draft.chunk.saved", {
+      chapterNo,
+      currentChunk: rec.currentChunk,
+      targetChunks: rec.targetChunks,
+      length: rec.text.length
+    });
+    saveState();
+  }
+  rec.done = true;
+  rec.status = "done";
+  rec.errorCode = "";
+  rec.updatedAt = new Date().toISOString();
+  pushDebugLog("draft.chapter.done", { chapterNo, length: rec.text.length });
+  return { ok: true, errorCode: "", statusText: `完成（${rec.text.length} 字）`, text: rec.text };
 }
 
 function isValidDraftText(text) {
@@ -870,6 +1764,19 @@ function isValidDraftText(text) {
   if (!t) return false;
   if (t.includes("【本地草稿】")) return false;
   return t.length >= 500;
+}
+
+function isValidDraftChunk(text) {
+  const t = String(text || "").trim();
+  if (!t) return false;
+  return t.length >= 220;
+}
+
+function isValidPilotText(text) {
+  const t = String(text || "").trim();
+  if (!t) return false;
+  if (t.includes("【本地試寫】")) return false;
+  return t.length >= 600;
 }
 
 function buildStrategyBrief(project) {
@@ -978,6 +1885,34 @@ ${draftPreview || "（無）"}
   return text || local;
 }
 
+function buildPilotRewritePrompt(project, sourceText, dissatisfactionText) {
+  const planning = normalizePlanning(safeJson(project.stages.PLANNING.currentText || "{}"));
+  const hardRules = (planning.world_rules.hard_rules || []).map((x) => String(x || "").trim()).filter(Boolean).slice(0, 5);
+  const styleDo = String(planning.style_constraints.style_do || "").trim();
+  const logline = String(planning.core_selling_points.logline || "").trim();
+  return `你是小說編輯。請根據作者不滿意點，重寫這段「試寫章」。
+
+作者不滿意點：
+${dissatisfactionText}
+
+故事核心（logline）：
+${logline || "（無）"}
+
+風格要求（style_do）：
+${styleDo || "（無）"}
+
+必守硬規則（不可違反）：
+${hardRules.map((x, i) => `${i + 1}. ${x}`).join("\n") || "（無）"}
+
+原試寫章：
+${String(sourceText || "").slice(0, 10000)}
+
+輸出要求：
+- 僅輸出重寫後正文
+- 字數 900-1400
+- 保留核心劇情方向，但需明顯回應作者不滿意點`;
+}
+
 async function handleConvertToPlanning(project) {
   await withProjectTask(project, "對話轉 Planning", async () => {
     const btn = $("chatToTemplateBtn");
@@ -1036,6 +1971,8 @@ async function handleAutoGenerate(project) {
       project.stages.PLANNING.currentText = JSON.stringify(nextPlanning);
       project.stages.BIBLE.currentText = JSON.stringify(result.bible || {});
       project.stages.OUTLINE.currentText = JSON.stringify(result.outline || {});
+      project.intakeCompleted = true;
+      project.showIntakeOverride = false;
       project.stage = "PLANNING";
       saveState();
       renderWorkspace();
@@ -1545,7 +2482,7 @@ function renderReadinessActions(project, readiness) {
     });
     const confirmBtn = document.createElement("button");
     confirmBtn.className = "btn mini";
-    confirmBtn.textContent = "我已確認";
+    confirmBtn.textContent = "作者已確認";
     confirmBtn.addEventListener("click", () => {
       confirmAuthorField(project, item);
       renderWorkspace();
@@ -1864,6 +2801,19 @@ function isMeaningfulValue(v) {
   return String(v || "").trim().length > 0;
 }
 
+function isPlanningSeeded(planning) {
+  const p = normalizePlanning(planning || {});
+  const checks = [
+    p.market_format.genre,
+    p.market_format.subgenre,
+    p.core_selling_points.logline,
+    p.world_rules.time_period,
+    p.plot_nodes.inciting_incident,
+    p.plot_nodes.climax
+  ];
+  return checks.filter((x) => String(x || "").trim()).length >= 3;
+}
+
 function isFieldReadyForConfirm(path, value) {
   if (path.endsWith("taboo")) {
     return Array.isArray(value) && value.filter((x) => String(x || "").trim()).length >= 5;
@@ -2103,6 +3053,8 @@ function saveVersion(project) {
 async function runQaDraft(project) {
   const qa = await buildQaReport(project);
   project.stages.QA.currentText = JSON.stringify(qa, null, 2);
+  project.qaDecisions = {};
+  project.qaRewriteCandidate = "";
   project.phase = "QA";
   saveVersion(project);
   saveState();
@@ -2158,6 +3110,115 @@ ${draftText.slice(0, 9000)}
   return normalized;
 }
 
+function normalizeQaIssueItem(it) {
+  if (!it) return null;
+  if (typeof it === "string") {
+    const parsed = parseQaIssueString(it);
+    return parsed;
+  }
+  const severity = String(it.severity || "medium").toLowerCase();
+  const title = String(it.title || "未命名問題").trim();
+  const evidence = String(it.evidence || "（無明確引用）").trim();
+  const suggestion = String(it.suggestion || "請補強此處。").trim();
+  if (!title && !evidence && !suggestion) return null;
+  return { severity, title, evidence, suggestion };
+}
+
+function parseQaIssueString(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  const parts = raw.split("|").map((x) => x.trim()).filter(Boolean);
+  const severity = String(parts[0] || "medium").toLowerCase();
+  const title = String(parts[1] || "未命名問題").replace(/^title[:：]/i, "").trim();
+  const evidenceRaw = parts.find((x) => /^證據[:：]|^evidence[:：]/i.test(x)) || parts[2] || "（無明確引用）";
+  const suggestionRaw = parts.find((x) => /^建議[:：]|^suggestion[:：]/i.test(x)) || parts[3] || "請補強此處。";
+  const evidence = evidenceRaw.replace(/^證據[:：]|^evidence[:：]/i, "").trim();
+  const suggestion = suggestionRaw.replace(/^建議[:：]|^suggestion[:：]/i, "").trim();
+  return { severity, title, evidence, suggestion };
+}
+
+function normalizeQaIssues(rawIssues) {
+  const arr = Array.isArray(rawIssues) ? rawIssues : [];
+  return arr.map((it) => normalizeQaIssueItem(it)).filter(Boolean);
+}
+
+function parseQaStageObject(project) {
+  const raw = project?.stages?.QA?.currentText || "{}";
+  const bible = safeJson(project?.stages?.BIBLE?.currentText || "{}");
+  const bibleRules = (bible?.world_rules?.hard_rules || []).map((x) => String(x || "").trim()).filter(Boolean);
+  let parsed = safeJson(raw);
+  if (parsed?._error) {
+    parsed = parseJsonLoose(raw);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    parsed = {};
+  }
+  const fallback = buildLocalQaReport(safeJson(project?.stages?.DRAFT?.currentText || "{}"), []);
+  const score = parsed.scores && typeof parsed.scores === "object" ? parsed.scores : {};
+  return {
+    source: String(parsed.source || "llm").trim() || "llm",
+    scores: {
+      consistency: Number(score.consistency || fallback.scores.consistency || 60),
+      motivation: Number(score.motivation || fallback.scores.motivation || 60),
+      pacing: Number(score.pacing || fallback.scores.pacing || 60),
+      hook: Number(score.hook || fallback.scores.hook || 60)
+    },
+    issues: normalizeQaIssues(parsed.issues || fallback.issues || []),
+    must_keep_rules: Array.isArray(parsed.must_keep_rules)
+      ? parsed.must_keep_rules.map((x) => String(x || "").trim()).filter(Boolean)
+      : bibleRules,
+    rewrite_brief: String(parsed.rewrite_brief || fallback.rewrite_brief || "").trim(),
+    qa_summary: String(parsed.qa_summary || fallback.qa_summary || "").trim()
+  };
+}
+
+function getQaSelectedIssues(project, qaObj, action = "adopt") {
+  const issues = Array.isArray(qaObj?.issues) ? qaObj.issues : [];
+  return issues.filter((_, idx) => String(project?.qaDecisions?.[String(idx)]?.action || "") === action);
+}
+
+function buildQaRewriteFallback(qaObj, adoptedIssues, draftText) {
+  const lines = [];
+  lines.push("【修稿草案（本地）】");
+  lines.push("");
+  lines.push("請依下列採納 issue 修正原稿：");
+  adoptedIssues.forEach((it, i) => {
+    lines.push(`${i + 1}. ${it.title}（${it.severity}）`);
+    lines.push(`- 依據：${it.evidence}`);
+    lines.push(`- 修改：${it.suggestion}`);
+  });
+  if (qaObj.rewrite_brief) {
+    lines.push("");
+    lines.push(`重寫指令：${qaObj.rewrite_brief}`);
+  }
+  lines.push("");
+  lines.push("=== 原稿 ===");
+  lines.push(String(draftText || ""));
+  return lines.join("\n");
+}
+
+async function buildQaRewriteCandidate(project, qaObj, adoptedIssues, draftText) {
+  const mustKeep = Array.isArray(qaObj.must_keep_rules) ? qaObj.must_keep_rules : [];
+  const fallback = buildQaRewriteFallback(qaObj, adoptedIssues, draftText);
+  if (!(state.api?.apiKey || "").trim()) return fallback;
+  const prompt = `你是小說修稿編輯。請直接輸出「可閱讀的修訂後正文」，不要 JSON，不要解釋。
+必守規則（不可違反）：
+${mustKeep.map((x, i) => `${i + 1}. ${x}`).join("\n") || "（無）"}
+
+採納的 QA 問題：
+${adoptedIssues.map((it, i) => `${i + 1}. [${it.severity}] ${it.title}\n證據：${it.evidence}\n修改建議：${it.suggestion}`).join("\n\n")}
+
+整體重寫指令：
+${qaObj.rewrite_brief || "請在不改核心設定下強化動機、節奏與章尾鉤子。"}
+
+原稿如下：
+${String(draftText || "").slice(0, 12000)}
+`;
+  const text = await callLLMText(prompt, 0.4, false, 90000);
+  if (!String(text || "").trim()) return fallback;
+  return String(text).trim();
+}
+
 function buildLocalQaReport(draftObj, mustKeepRules) {
   return {
     source: "local_fallback",
@@ -2168,10 +3229,30 @@ function buildLocalQaReport(draftObj, mustKeepRules) {
       hook: calcScore(draftObj, ["鉤子", "懸念", "下一章"])
     },
     issues: [
-      "high | 世界規則一致性 | 請比對草稿是否違反 Bible hard_rules | 修正違規設定或補上限制代價。",
-      "medium | 人物動機前置 | 檢查重大決策前是否有情緒/事件鋪墊 | 補一段動機轉折。",
-      "medium | 段落重複 | 檢查描述是否重覆同一信息 | 合併重覆段落並提升信息密度。",
-      "medium | 章尾鉤子 | 檢查章尾是否存在明確懸念/反轉 | 章尾追加下一章驅動問題。"
+      {
+        severity: "high",
+        title: "世界規則一致性",
+        evidence: "請比對草稿是否違反 Bible hard_rules",
+        suggestion: "修正違規設定或補上限制代價。"
+      },
+      {
+        severity: "medium",
+        title: "人物動機前置",
+        evidence: "檢查重大決策前是否有情緒/事件鋪墊",
+        suggestion: "補一段動機轉折。"
+      },
+      {
+        severity: "medium",
+        title: "段落重複",
+        evidence: "檢查描述是否重覆同一信息",
+        suggestion: "合併重覆段落並提升信息密度。"
+      },
+      {
+        severity: "medium",
+        title: "章尾鉤子",
+        evidence: "檢查章尾是否存在明確懸念/反轉",
+        suggestion: "章尾追加下一章驅動問題。"
+      }
     ],
     must_keep_rules: mustKeepRules,
     rewrite_brief: "重寫時保留 hard_rules，不改世界底層規則，補強章尾鉤子與動機遞進。",
@@ -2191,18 +3272,8 @@ function normalizeQaReport(parsed, mustKeepRules, fallbackQa) {
     pacing: safeScore(parsed?.scores?.pacing, fallbackQa.scores.pacing),
     hook: safeScore(parsed?.scores?.hook, fallbackQa.scores.hook)
   };
-  let issues = Array.isArray(parsed?.issues) ? parsed.issues : [];
-  issues = issues.map((it) => {
-    if (typeof it === "string") return it.trim();
-    const sev = String(it?.severity || "medium").trim();
-    const title = String(it?.title || "未命名問題").trim();
-    const evidence = String(it?.evidence || "（無明確引用）").trim();
-    const suggestion = String(it?.suggestion || "請補強此處。").trim();
-    return `${sev} | ${title} | 證據:${evidence} | 建議:${suggestion}`;
-  }).filter(Boolean);
-  if (issues.length < 4) {
-    issues = fallbackQa.issues;
-  }
+  let issues = normalizeQaIssues(parsed?.issues || []);
+  if (issues.length < 4) issues = normalizeQaIssues(fallbackQa.issues || []);
   const rewriteBrief = String(parsed?.rewrite_brief || "").trim() || fallbackQa.rewrite_brief;
   const qaSummary = String(parsed?.qa_summary || "").trim() || fallbackQa.qa_summary;
   return {
@@ -2783,13 +3854,17 @@ function defaultApiConfig() {
 function defaultDebugConfig() {
   return {
     enabled: true,
-    logs: []
+    logs: [],
+    projectOnly: false
   };
 }
 
 function hydrateState(input) {
   const next = input && typeof input === "object" ? input : {};
   const projects = Array.isArray(next.projects) ? next.projects : [];
+  const uiCollapsed = next.ui && typeof next.ui === "object" && next.ui.collapsed && typeof next.ui.collapsed === "object"
+    ? next.ui.collapsed
+    : {};
   return {
     projects: projects.map((p) => {
       const project = {
@@ -2801,9 +3876,14 @@ function hydrateState(input) {
         authorInputs: p.authorInputs && typeof p.authorInputs === "object" ? p.authorInputs : {},
         autoFillHints: typeof p.autoFillHints === "string" ? p.autoFillHints : "",
         intakeLevel: typeof p.intakeLevel === "string" ? p.intakeLevel : "未輸入",
+        intakeCompleted: typeof p.intakeCompleted === "boolean" ? p.intakeCompleted : false,
+        showIntakeOverride: typeof p.showIntakeOverride === "boolean" ? p.showIntakeOverride : false,
         phaseEdit: p.phaseEdit && typeof p.phaseEdit === "object" ? p.phaseEdit : {},
         production: p.production && typeof p.production === "object" ? p.production : {},
-        runtime: p.runtime && typeof p.runtime === "object" ? p.runtime : { busy: false, task: "", taskId: "", startedAt: "" },
+        chapterDrafts: p.chapterDrafts && typeof p.chapterDrafts === "object" ? p.chapterDrafts : {},
+        qaDecisions: p.qaDecisions && typeof p.qaDecisions === "object" ? p.qaDecisions : {},
+        qaRewriteCandidate: typeof p.qaRewriteCandidate === "string" ? p.qaRewriteCandidate : "",
+        runtime: p.runtime && typeof p.runtime === "object" ? p.runtime : { busy: false, task: "", taskId: "", startedAt: "", abortRequested: false },
         readinessLog: Array.isArray(p.readinessLog) ? p.readinessLog : [],
         chatHistory: Array.isArray(p.chatHistory) ? p.chatHistory : [],
         locks: p.locks && typeof p.locks === "object" ? p.locks : {},
@@ -2814,7 +3894,8 @@ function hydrateState(input) {
     }),
     activeProjectId: next.activeProjectId || null,
     api: { ...defaultApiConfig(), ...(next.api || {}) },
-    debug: { ...defaultDebugConfig(), ...(next.debug || {}) }
+    debug: { ...defaultDebugConfig(), ...(next.debug || {}) },
+    ui: { collapsed: uiCollapsed }
   };
 }
 
@@ -2853,8 +3934,12 @@ function ensureProjectDefaults(project) {
     project.opLog = [];
   }
   if (!project.pilot || typeof project.pilot !== "object") {
-    project.pilot = { text: "", qa: "" };
+    project.pilot = { text: "", qa: "", status: "待命", errorCode: "", dissatisfaction: "", rewriteCandidate: "" };
   }
+  if (typeof project.pilot.status !== "string") project.pilot.status = "待命";
+  if (typeof project.pilot.errorCode !== "string") project.pilot.errorCode = "";
+  if (typeof project.pilot.dissatisfaction !== "string") project.pilot.dissatisfaction = "";
+  if (typeof project.pilot.rewriteCandidate !== "string") project.pilot.rewriteCandidate = "";
   if (typeof project.tasksCollapsed !== "boolean") {
     project.tasksCollapsed = true;
   }
@@ -2875,6 +3960,13 @@ function ensureProjectDefaults(project) {
   }
   if (typeof project.intakeLevel !== "string") {
     project.intakeLevel = "未輸入";
+  }
+  if (typeof project.intakeCompleted !== "boolean") {
+    const planning = normalizePlanning(safeJson(project?.stages?.PLANNING?.currentText || "{}"));
+    project.intakeCompleted = isPlanningSeeded(planning);
+  }
+  if (typeof project.showIntakeOverride !== "boolean") {
+    project.showIntakeOverride = false;
   }
   if (!project.phaseEdit || typeof project.phaseEdit !== "object") {
     project.phaseEdit = {};
@@ -2905,15 +3997,42 @@ function ensureProjectDefaults(project) {
   if (!Number.isFinite(project.production.targetChapterNo)) {
     project.production.targetChapterNo = 1;
   }
+  if (!Number.isFinite(project.production.batchFrom)) {
+    project.production.batchFrom = 1;
+  }
+  if (!Number.isFinite(project.production.batchTo)) {
+    project.production.batchTo = 5;
+  }
+  if (!project.production.run || typeof project.production.run !== "object") {
+    project.production.run = { running: false, currentChapterNo: 0, from: 1, to: 5, total: 0, completed: 0, failed: 0, updatedAt: "" };
+  }
+  if (typeof project.production.run.running !== "boolean") project.production.run.running = false;
+  if (!Number.isFinite(project.production.run.currentChapterNo)) project.production.run.currentChapterNo = 0;
+  if (!Number.isFinite(project.production.run.from)) project.production.run.from = project.production.batchFrom || 1;
+  if (!Number.isFinite(project.production.run.to)) project.production.run.to = project.production.batchTo || 5;
+  if (!Number.isFinite(project.production.run.total)) project.production.run.total = 0;
+  if (!Number.isFinite(project.production.run.completed)) project.production.run.completed = 0;
+  if (!Number.isFinite(project.production.run.failed)) project.production.run.failed = 0;
+  if (typeof project.production.run.updatedAt !== "string") project.production.run.updatedAt = "";
+  if (!project.chapterDrafts || typeof project.chapterDrafts !== "object") {
+    project.chapterDrafts = {};
+  }
   if (!project.runtime || typeof project.runtime !== "object") {
-    project.runtime = { busy: false, task: "", taskId: "", startedAt: "" };
+    project.runtime = { busy: false, task: "", taskId: "", startedAt: "", abortRequested: false };
   }
   if (typeof project.runtime.busy !== "boolean") project.runtime.busy = false;
   if (typeof project.runtime.task !== "string") project.runtime.task = "";
   if (typeof project.runtime.taskId !== "string") project.runtime.taskId = "";
   if (typeof project.runtime.startedAt !== "string") project.runtime.startedAt = "";
+  if (typeof project.runtime.abortRequested !== "boolean") project.runtime.abortRequested = false;
   if (!project.authorConfirm || typeof project.authorConfirm !== "object") {
     project.authorConfirm = {};
+  }
+  if (!project.qaDecisions || typeof project.qaDecisions !== "object") {
+    project.qaDecisions = {};
+  }
+  if (typeof project.qaRewriteCandidate !== "string") {
+    project.qaRewriteCandidate = "";
   }
   NON_GUESSABLE_FIELDS.forEach((f) => {
     if (typeof project.authorConfirm[f.key] !== "boolean") {
@@ -2991,14 +4110,17 @@ function ensureDebugState() {
   if (!state.debug || typeof state.debug !== "object") state.debug = defaultDebugConfig();
   if (!Array.isArray(state.debug.logs)) state.debug.logs = [];
   if (typeof state.debug.enabled !== "boolean") state.debug.enabled = true;
+  if (typeof state.debug.projectOnly !== "boolean") state.debug.projectOnly = false;
 }
 
 function renderDebugStatus() {
   ensureDebugState();
   const el = $("debugStatus");
   const btn = $("toggleDebugBtn");
+  const cb = $("debugProjectOnly");
   if (el) el.textContent = `Debug: ${state.debug.enabled ? "ON" : "OFF"}`;
   if (btn) btn.textContent = `診斷模式：${state.debug.enabled ? "ON" : "OFF"}`;
+  if (cb) cb.checked = !!state.debug.projectOnly;
   renderDebugViewer();
 }
 
@@ -3022,6 +4144,7 @@ function recoverStaleBusyTasks() {
       p.runtime.task = "";
       p.runtime.taskId = "";
       p.runtime.startedAt = "";
+      p.runtime.abortRequested = false;
       pushDebugLog("task.stale_reset", { reason: "invalid_startedAt", projectId: p.id }, "warn");
       return;
     }
@@ -3031,6 +4154,7 @@ function recoverStaleBusyTasks() {
       p.runtime.task = "";
       p.runtime.taskId = "";
       p.runtime.startedAt = "";
+      p.runtime.abortRequested = false;
       pushDebugLog("task.stale_reset", { projectId: p.id, oldTask, staleMs }, "warn");
     }
   });
@@ -3046,8 +4170,10 @@ function forceUnlockActiveProject() {
   p.runtime.task = "";
   p.runtime.taskId = "";
   p.runtime.startedAt = "";
+  p.runtime.abortRequested = false;
   saveState();
   setProjectBusyUI(p, false, "");
+  hideTaskModal();
   pushDebugLog("task.force_unlock", { oldTask }, "warn");
   showToast("已強制解鎖目前專案", "warn");
 }
@@ -3097,6 +4223,7 @@ function exportDebugPack() {
     activeProject: project ? { id: project.id, title: project.title, phase: project.phase, stage: project.stage } : null,
     debug: {
       enabled: state.debug.enabled,
+      projectOnly: state.debug.projectOnly,
       logs: state.debug.logs
     }
   };
@@ -3114,7 +4241,11 @@ function renderDebugViewer() {
   const project = currentProject();
   const text = buildDebugViewerText(project);
   ta.value = text;
-  meta.textContent = `Logs: ${state.debug.logs.length} | Project: ${project?.title || "-"} | Phase: ${project?.phase || "-"} | Stage: ${project?.stage || "-"}`;
+  const total = Array.isArray(state.debug.logs) ? state.debug.logs.length : 0;
+  const shown = (state.debug.projectOnly && project?.id)
+    ? state.debug.logs.filter((x) => x.projectId === project.id).length
+    : total;
+  meta.textContent = `Logs: ${shown}/${total} | Project: ${project?.title || "-"} | Filter: ${state.debug.projectOnly ? "Current Only" : "All"} | Phase: ${project?.phase || "-"} | Stage: ${project?.stage || "-"}`;
 }
 
 function buildDebugViewerText(project) {
@@ -3122,6 +4253,7 @@ function buildDebugViewerText(project) {
   lines.push(`# Debug Snapshot`);
   lines.push(`time: ${new Date().toISOString()}`);
   lines.push(`debug_enabled: ${state.debug?.enabled ? "true" : "false"}`);
+  lines.push(`project_filter: ${state.debug?.projectOnly ? "current_only" : "all"}`);
   lines.push(`active_project: ${project?.title || "-"}`);
   lines.push(`active_phase: ${project?.phase || "-"}`);
   lines.push(`active_stage: ${project?.stage || "-"}`);
@@ -3147,7 +4279,11 @@ function buildDebugViewerText(project) {
   }
   lines.push("");
   lines.push(`## Debug Events`);
-  const ev = Array.isArray(state.debug?.logs) ? state.debug.logs.slice(0, 120) : [];
+  const allEvents = Array.isArray(state.debug?.logs) ? state.debug.logs : [];
+  const scoped = (state.debug?.projectOnly && project?.id)
+    ? allEvents.filter((x) => x.projectId === project.id)
+    : allEvents;
+  const ev = scoped.slice(0, 120);
   if (!ev.length) {
     lines.push("- (empty)");
   } else {
@@ -3232,6 +4368,7 @@ async function callLLMText(prompt, temperature = 0.5, forceJson = false, timeout
     return returnMeta ? { content: "", errorCode: "network" } : "";
   }
   let timeout = null;
+  let controller = null;
   const reqId = crypto.randomUUID();
   const startAt = Date.now();
   pushDebugLog("llm.call.start", {
@@ -3243,7 +4380,10 @@ async function callLLMText(prompt, temperature = 0.5, forceJson = false, timeout
     promptPreview: previewText(prompt, 280)
   });
   try {
-    const controller = new AbortController();
+    controller = new AbortController();
+    activeLlmController = controller;
+    const project = currentProject();
+    showTaskModal(project?.runtime?.task || "AI 任務", project?.phase || "", "連線模型中...");
     timeout = setTimeout(() => controller.abort(), timeoutMs);
     const resp = await fetch(`${api.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
@@ -3265,6 +4405,7 @@ async function callLLMText(prompt, temperature = 0.5, forceJson = false, timeout
         ]
       })
     });
+    updateTaskModalStatus("模型回覆中，正在解析...");
     const raw = await resp.text();
     let data = {};
     try {
@@ -3273,7 +4414,9 @@ async function callLLMText(prompt, temperature = 0.5, forceJson = false, timeout
       data = {};
     }
     if (!resp.ok) {
-      const errorCode = [408, 504].includes(resp.status) ? "timeout" : "network";
+      const abortedByUser = controller.signal.aborted && String(controller.signal.reason || "").includes("user_abort");
+      const errorCode = abortedByUser ? "aborted" : ([408, 504].includes(resp.status) ? "timeout" : "network");
+      updateTaskModalStatus(abortedByUser ? "已由使用者終止" : `請求失敗 (${resp.status})`);
       pushDebugLog("llm.call.fail", {
         reqId,
         status: resp.status,
@@ -3287,9 +4430,11 @@ async function callLLMText(prompt, temperature = 0.5, forceJson = false, timeout
           600
         )
       }, "err");
+      if (abortedByUser && !returnMeta) throw new Error("__USER_ABORT__");
       return returnMeta ? { content: "", errorCode, status: resp.status } : "";
     }
     const content = String(data?.choices?.[0]?.message?.content || "");
+    updateTaskModalStatus(`完成（回覆 ${content.length} 字）`);
     pushDebugLog("llm.call.success", {
       reqId,
       ms: Date.now() - startAt,
@@ -3299,11 +4444,18 @@ async function callLLMText(prompt, temperature = 0.5, forceJson = false, timeout
     return returnMeta ? { content, errorCode: "" } : content;
   } catch (err) {
     const msg = String(err?.message || err || "unknown");
-    const errorCode = /aborted/i.test(msg) ? "timeout" : "network";
+    const abortedByUser = !!(controller?.signal?.aborted && String(controller?.signal?.reason || "").includes("user_abort"));
+    const errorCode = abortedByUser ? "aborted" : (/aborted/i.test(msg) ? "timeout" : "network");
+    updateTaskModalStatus(abortedByUser ? "已由使用者終止" : "連線失敗");
     pushDebugLog("llm.call.error", { reqId, ms: Date.now() - startAt, error: msg }, "err");
+    if (abortedByUser && !returnMeta) throw new Error("__USER_ABORT__");
     return returnMeta ? { content: "", errorCode } : "";
   } finally {
     if (timeout) clearTimeout(timeout);
+    activeLlmController = null;
+    setTimeout(() => {
+      if (!activeLlmController) hideTaskModal();
+    }, 350);
   }
 }
 
@@ -3320,6 +4472,16 @@ function previewText(text, max = 500) {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max)} ...[truncated]`;
+}
+
+function prettyJsonText(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  const parsed = safeJson(raw);
+  if (parsed && !parsed._error) {
+    return JSON.stringify(parsed, null, 2);
+  }
+  return String(text || "");
 }
 
 function setApiStatus(text) {
@@ -3359,6 +4521,62 @@ function setAutoStatus(text, tone = "") {
   if (tone) el.classList.add(tone);
 }
 
+function updateTaskModalElapsed() {
+  const el = $("taskModalElapsed");
+  if (!el || !taskModalStartAt) return;
+  const sec = Math.max(0, Math.floor((Date.now() - taskModalStartAt) / 1000));
+  el.textContent = `耗時：${sec} 秒`;
+}
+
+function showTaskModal(taskName, phase = "", status = "準備連線...") {
+  const modal = $("taskModal");
+  if (!modal) return;
+  taskModalStartAt = Date.now();
+  $("taskModalTask").textContent = `任務：${taskName || "-"}`;
+  $("taskModalPhase").textContent = `階段：${phase || "-"}`;
+  $("taskModalStatus").textContent = `狀態：${status}`;
+  updateTaskModalElapsed();
+  modal.classList.remove("hidden");
+  if (taskModalTimer) clearInterval(taskModalTimer);
+  taskModalTimer = setInterval(updateTaskModalElapsed, 1000);
+}
+
+function updateTaskModalStatus(status) {
+  const el = $("taskModalStatus");
+  if (!el) return;
+  el.textContent = `狀態：${status || "-"}`;
+}
+
+function hideTaskModal() {
+  const modal = $("taskModal");
+  if (modal) modal.classList.add("hidden");
+  if (taskModalTimer) clearInterval(taskModalTimer);
+  taskModalTimer = null;
+  taskModalStartAt = 0;
+}
+
+function abortActiveAiTask() {
+  const p = currentProject();
+  if (p?.runtime?.busy) {
+    p.runtime.abortRequested = true;
+    saveState();
+  }
+  if (activeLlmController) {
+    try {
+      activeLlmController.abort("user_abort");
+    } catch {
+      activeLlmController.abort();
+    }
+    updateTaskModalStatus("已由使用者終止，正在收尾...");
+    pushDebugLog("task.abort_by_user", { task: p?.runtime?.task || "" }, "warn");
+    showToast("已送出強制終止", "warn");
+  } else {
+    hideTaskModal();
+    updateTaskModalStatus("目前沒有可終止的 AI 請求");
+    showToast("目前沒有可終止的 AI 請求，已關閉視窗", "warn");
+  }
+}
+
 function setProjectBusyUI(project, busy, task = "") {
   document.body.classList.toggle("is-busy", !!busy);
   const status = busy ? `狀態：執行中（${task || "任務"}），請稍候...` : (project?.chatState?.text || "狀態：待命");
@@ -3393,12 +4611,19 @@ async function withProjectTask(project, taskName, runner) {
   project.runtime.task = taskName;
   project.runtime.taskId = crypto.randomUUID();
   project.runtime.startedAt = new Date().toISOString();
+  project.runtime.abortRequested = false;
   saveState();
   setProjectBusyUI(project, true, taskName);
   pushDebugLog("task.start", { taskName, taskId: project.runtime.taskId, startedAt: project.runtime.startedAt });
   try {
     return await runner();
   } catch (err) {
+    const msg = String(err?.message || err || "");
+    if (msg.includes("__USER_ABORT__")) {
+      pushDebugLog("task.aborted", { taskName, taskId: project.runtime.taskId }, "warn");
+      showToast(`已終止：${taskName}`, "warn");
+      return null;
+    }
     pushDebugLog("task.error", { taskName, taskId: project.runtime.taskId, error: String(err?.message || err || "unknown") }, "err");
     throw err;
   } finally {
@@ -3406,6 +4631,7 @@ async function withProjectTask(project, taskName, runner) {
     project.runtime.task = "";
     project.runtime.taskId = "";
     project.runtime.startedAt = "";
+    project.runtime.abortRequested = false;
     saveState();
     setProjectBusyUI(project, false, "");
     pushDebugLog("task.end", { taskName });

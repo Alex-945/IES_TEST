@@ -9,6 +9,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <h1 className="text-xl font-bold">Novel Workbench</h1>
           <nav className="flex gap-3 text-sm">
             <Link href="/projects">Projects</Link>
+            <Link href="/cqe-weekly">CQE Weekly</Link>
           </nav>
         </header>
         {children}

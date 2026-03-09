@@ -26,8 +26,12 @@
       </div>
     </header>
 
-    <section class="card api-panel">
-      <h2>API 接入區 / API Connection</h2>
+    <section class="card api-panel" data-collapsible-id="api-panel">
+      <div class="panel-head">
+        <h2>API 接入區 / API Connection</h2>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
       <div class="api-grid">
         <label>
           Base URL / 服務位址
@@ -47,25 +51,37 @@
         <button id="testApiBtn" class="btn secondary">測試連線</button>
         <span id="apiStatus" class="tag">尚未測試</span>
       </div>
+      </div>
     </section>
 
-    <section class="card debug-panel">
-      <h2>診斷面板 / Debug Panel</h2>
+    <section class="card debug-panel" data-collapsible-id="debug-panel">
+      <div class="panel-head">
+        <h2>診斷面板 / Debug Panel</h2>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
       <div class="actions">
         <button id="refreshDebugBtn" data-busy-ignore="true" class="btn secondary">更新內容</button>
         <button id="copyDebugBtn" data-busy-ignore="true" class="btn secondary"><span class="icon-copy" aria-hidden="true"></span>一鍵複製</button>
+        <label class="tag"><input id="debugProjectOnly" data-busy-ignore="true" type="checkbox" /> 只看目前專案</label>
       </div>
       <div id="debugMeta" class="chat-status">尚無資料</div>
       <textarea id="debugViewer" readonly placeholder="這裡會顯示診斷紀錄（可直接複製貼給我）"></textarea>
+      </div>
     </section>
 
-    <section class="card project-bar">
-      <h2>Projects / 專案</h2>
+    <section class="card project-bar" data-collapsible-id="project-panel">
+      <div class="panel-head">
+        <h2>Projects / 專案</h2>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
       <div class="new-project">
         <input id="projectName" placeholder="新專案名稱 / Project Name（例：潮汐引擎）" />
         <button id="createProjectBtn" class="btn">新增 / Create</button>
       </div>
       <ul id="projectList" class="list project-list-horizontal"></ul>
+      </div>
     </section>
 
     <section class="card workspace-main" id="workspace">
@@ -79,8 +95,18 @@
       <span id="folderStatus" class="tag">未綁定資料夾</span>
     </div>
 
-    <article class="card panel full">
-      <h3>智慧入口 / Smart Intake</h3>
+    <article class="card panel full" data-collapsible-id="smart-intake-panel">
+      <div class="panel-head">
+        <h3>智慧入口 / Smart Intake</h3>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
+      <div id="intakeLockedPane" class="entry-pane hidden">
+        <div class="chat-status">智慧入口已關閉（避免覆蓋既有策略資料）。</div>
+        <div class="actions">
+          <button id="reopenIntakeBtn" class="btn secondary">重新開啟智慧入口（有覆蓋風險）</button>
+        </div>
+      </div>
       <div id="autoPane" class="entry-pane">
         <div class="chat-status">
           請輸入一句故事想法或貼上你的設定片段。系統會自動判定完整度並給出下一步。
@@ -144,10 +170,15 @@
           <div id="questionList"></div>
         </div>
       </div>
+      </div>
     </article>
 
-    <article class="card panel full">
-      <h3>創作儀表板 / Confidence Panel</h3>
+    <article class="card panel full" data-collapsible-id="confidence-panel">
+      <div class="panel-head">
+        <h3>創作儀表板 / Confidence Panel</h3>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
       <div class="score-grid">
         <div class="score-item"><strong>完整度 Coverage</strong><div id="scoreCoverage">0</div></div>
         <div class="score-item"><strong>一致性風險 Consistency Risk</strong><div id="scoreRisk">0</div></div>
@@ -184,18 +215,42 @@
         <input id="lockHardRules" type="checkbox" />
         鎖定世界硬規則 / Lock `world_rules.hard_rules`（AI 不可改）
       </label>
+      </div>
     </article>
 
-    <article class="card panel full">
-      <h3>流程切換 / Workflow</h3>
+    <article class="card panel full" data-collapsible-id="workflow-panel">
+      <div class="panel-head">
+        <h3>流程切換 / Workflow</h3>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
       <div id="stageGuide" class="stage-guide"></div>
+      </div>
     </article>
 
-    <article class="card panel full">
-      <h3 id="phaseTitle">工作區 / Workspace</h3>
+    <article class="card panel full" data-collapsible-id="phase-workspace-panel">
+      <div class="panel-head">
+        <h3 id="phaseTitle">工作區 / Workspace</h3>
+        <button class="btn secondary mini" type="button" data-collapse-btn data-busy-ignore="true">收合</button>
+      </div>
+      <div data-collapse-body>
       <div id="phaseWorkspace"></div>
+      </div>
     </article>
   </template>
+
+  <div id="taskModal" class="task-modal hidden" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+    <div class="task-modal-card">
+      <h3 id="taskModalTitle">AI 任務執行中</h3>
+      <div id="taskModalTask" class="chat-status">任務：-</div>
+      <div id="taskModalPhase" class="chat-status">階段：-</div>
+      <div id="taskModalStatus" class="chat-status">狀態：待命</div>
+      <div id="taskModalElapsed" class="chat-status">耗時：0 秒</div>
+      <div class="actions">
+        <button id="taskModalAbortBtn" data-busy-ignore="true" class="btn secondary">強制終止</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast hidden"></div>
   <script src="./app.js"></script>
