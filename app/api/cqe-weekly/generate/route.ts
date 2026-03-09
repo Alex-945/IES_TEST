@@ -1,5 +1,6 @@
 import { cqeWeeklyAiSchema } from "@/lib/schemas";
 import { buildTemplateCatalogText, getTemplateById } from "@/lib/cqeWeeklyTemplates";
+import { buildGlossaryText, buildProjectMemoryText } from "@/lib/cqeWeeklyKnowledge";
 
 const BASE_URL = process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com";
 const MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
@@ -25,8 +26,14 @@ export async function POST(req: Request) {
     "Return strict JSON only.",
     "Do not invent precise facts when missing. Use an empty string for unknown values.",
     "Prefer concise engineering wording suitable for a weekly summary.",
+    "Use the project memory below when you see matching customer/product/project context.",
+    "Use the glossary below for controlled CQE wording.",
     "Template catalog:",
     buildTemplateCatalogText(),
+    "Project memory:",
+    buildProjectMemoryText(),
+    "Glossary:",
+    buildGlossaryText(),
     'Required JSON shape: {"templateId":"...","values":{"fieldKey":"value"},"confidence":0.0,"notes":["short note"]}'
   ].join("\n\n");
 

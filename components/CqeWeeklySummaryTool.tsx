@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   cqeWeeklyTemplates,
   generateSummary,
   getTemplateById,
   summaryRules
 } from "@/lib/cqeWeeklyTemplates";
+import { glossary, projectMemory } from "@/lib/cqeWeeklyKnowledge";
 
 type FormValues = Record<string, string>;
 type AiState = {
@@ -33,16 +34,17 @@ export default function CqeWeeklySummaryTool() {
     notes: []
   });
 
-  useEffect(() => {
-    setValues(createInitialValues(templateId));
-    setCopied("");
-  }, [templateId]);
-
   const currentTemplate = getTemplateById(templateId);
   const result = generateSummary(templateId, values);
 
   function handleChange(key: string, nextValue: string) {
     setValues((current) => ({ ...current, [key]: nextValue }));
+  }
+
+  function handleTemplateSelect(nextTemplateId: string) {
+    setTemplateId(nextTemplateId);
+    setValues(createInitialValues(nextTemplateId));
+    setCopied("");
   }
 
   async function handleAiGenerate() {
@@ -71,8 +73,7 @@ export default function CqeWeeklySummaryTool() {
       }
 
       setTemplateId(payload.templateId);
-      setValues(createInitialValues(payload.templateId));
-      setValues((current) => ({ ...current, ...payload.values }));
+      setValues({ ...createInitialValues(payload.templateId), ...payload.values });
       setAiState({
         loading: false,
         error: "",
@@ -164,7 +165,7 @@ export default function CqeWeeklySummaryTool() {
               <label className="mb-2 block text-sm font-medium text-slate-200">選擇模板</label>
               <select
                 value={templateId}
-                onChange={(event) => setTemplateId(event.target.value)}
+                onChange={(event) => handleTemplateSelect(event.target.value)}
                 className="border-white/10 bg-slate-950/80 text-white"
               >
                 {cqeWeeklyTemplates.map((template) => (
@@ -176,6 +177,16 @@ export default function CqeWeeklySummaryTool() {
               <div className="mt-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm text-slate-300">
                 <div className="mb-1 text-cyan-300">{currentTemplate.description}</div>
                 <div className="font-mono text-xs text-slate-400">{currentTemplate.sourceTemplate}</div>
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/5 bg-white/5 p-3 text-xs text-slate-300">
+                  <div className="mb-1 text-slate-100">Project Memory</div>
+                  <div>{projectMemory.length} 筆可擴充主資料</div>
+                </div>
+                <div className="rounded-2xl border border-white/5 bg-white/5 p-3 text-xs text-slate-300">
+                  <div className="mb-1 text-slate-100">Controlled Glossary</div>
+                  <div>{glossary.length} 筆受控術語</div>
+                </div>
               </div>
             </div>
 

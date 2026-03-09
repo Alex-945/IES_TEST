@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CQE Weekly Summary Tool</title>
+  <style>
+    :root { --bg:#09121f; --panel:#111d2d; --panel2:#0d1724; --line:#24344b; --text:#e9f0f9; --muted:#98a9c0; --accent:#ffb703; --accent2:#7bdff6; --ok:#72d69b; --warn:#ff9f43; --bad:#ff7b7b; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Segoe UI","Microsoft JhengHei",sans-serif; color:var(--text); background:radial-gradient(circle at top left,rgba(255,183,3,.18),transparent 28%),linear-gradient(135deg,#08111b 0%,#102238 100%); min-height:100vh; }
+    .shell { max-width:1480px; margin:0 auto; padding:24px; }
+    .hero,.panel,.modal { background:rgba(11,22,36,.94); border:1px solid var(--line); box-shadow:0 24px 80px rgba(0,0,0,.24); }
+    .hero { border-radius:24px; padding:24px; margin-bottom:18px; }
+    .hero-head { display:flex; gap:16px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; }
+    .eyebrow { margin:0 0 6px; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.28em; }
+    h1 { margin:0; font-size:34px; line-height:1.15; }
+    .sub { margin:10px 0 0; color:var(--muted); font-size:15px; line-height:1.8; max-width:920px; }
+    .badges,.meta,.actions,.tab-row { display:flex; gap:10px; flex-wrap:wrap; }
+    .badge,.meta-item { border:1px solid var(--line); border-radius:999px; padding:8px 12px; font-size:12px; color:var(--muted); background:rgba(255,255,255,.03); }
+    .badge.primary { background:var(--accent); border-color:transparent; color:#06111b; font-weight:700; }
+    .tab-row { margin:18px 0 0; }
+    .tab { border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:14px; padding:11px 14px; cursor:pointer; font:inherit; font-weight:700; }
+    .tab.active { background:rgba(255,183,3,.12); color:var(--text); border-color:rgba(255,183,3,.4); }
+    .panel { border-radius:22px; padding:20px; }
+    .page { display:none; }
+    .page.active { display:block; }
+    .grid { display:grid; grid-template-columns:1.15fr .85fr; gap:18px; }
+    .stack,.field,.block { margin-bottom:14px; }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .section-title { margin:0 0 8px; font-size:20px; }
+    .section-desc { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.7; }
+    label { display:block; margin-bottom:7px; font-size:13px; font-weight:600; color:#dce7f6; }
+    input,textarea,select { width:100%; border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--panel2); color:var(--text); outline:none; font:inherit; }
+    textarea { min-height:120px; resize:vertical; }
+    input:focus,textarea:focus,select:focus { border-color:rgba(255,183,3,.5); box-shadow:0 0 0 3px rgba(255,183,3,.14); }
+    button { border:0; border-radius:14px; padding:11px 15px; font:inherit; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .btn-accent { background:var(--accent); color:#06111b; }
+    .btn-soft { background:rgba(255,255,255,.04); color:var(--text); border:1px solid var(--line); }
+    .btn-sky { background:var(--accent2); color:#06111b; }
+    .btn-danger { background:rgba(255,123,123,.15); color:#ffd4d4; border:1px solid rgba(255,123,123,.35); }
+    .notice { border:1px solid var(--line); border-radius:16px; padding:13px 14px; font-size:14px; line-height:1.7; color:var(--muted); background:rgba(255,255,255,.03); }
+    .notice.good { border-color:rgba(114,214,155,.35); background:rgba(114,214,155,.08); color:#d7ffe6; }
+    .notice.warn { border-color:rgba(255,159,67,.35); background:rgba(255,159,67,.08); color:#ffe3bf; }
+    .notice.bad { border-color:rgba(255,123,123,.35); background:rgba(255,123,123,.08); color:#ffd6d6; }
+    .output-box,.info-box,.table-wrap,.log-item { border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.03); }
+    .output-box { padding:16px; min-height:160px; line-height:1.85; white-space:pre-wrap; }
+    .info-box { padding:14px; color:var(--muted); font-size:13px; line-height:1.7; }
+    .table-wrap { overflow:auto; max-height:480px; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { border-bottom:1px solid var(--line); padding:10px 12px; text-align:left; font-size:13px; vertical-align:top; }
+    th { position:sticky; top:0; background:#162436; color:#dce7f6; z-index:1; }
+    .small { font-size:12px; color:var(--muted); }
+    .mono { font-family:Consolas,"Courier New",monospace; }
+    .hidden { display:none !important; }
+    .log-list { display:grid; gap:12px; }
+    .log-item { padding:16px; }
+    .log-head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+    .log-version { font-weight:700; color:var(--accent); }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:20px; z-index:100; }
+    .modal-backdrop.active { display:flex; }
+    .modal { width:min(760px,100%); border-radius:22px; padding:20px; }
+    .modal-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; }
+    @media (max-width:1080px) { .grid { grid-template-columns:1fr; } }
+    @media (max-width:760px) { .shell { padding:14px; } .hero,.panel { padding:16px; border-radius:18px; } .field-grid { grid-template-columns:1fr; } h1 { font-size:28px; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-head">
+        <div>
+          <p class="eyebrow">CQE Weekly Summary</p>
+          <h1>AI 驅動的固定句型總結工具</h1>
+          <div class="badges" style="margin-top:12px;">
+            <div class="badge primary">測試版</div>
+            <div class="badge">Version: v0.2.0-beta</div>
+            <div class="badge">Status: 未放行</div>
+          </div>
+          <p class="sub">這是純 HTML 版本，不需要 Node。主流程是工程師貼入原始資訊，AI 自動選模板與拆欄位；若 AI 無法使用，也能手動維護模板、專案對照表與專有名詞對應。</p>
+        </div>
+      </div>
+      <div class="tab-row">
+        <button class="tab active" data-page="generator">Summary Tool</button>
+        <button class="tab" data-page="version">版本進版</button>
+        <button class="tab" data-page="project">專案對照表</button>
+        <button class="tab" data-page="glossary">專有名詞對應</button>
+      </div>
+    </section>
+
+    <section id="page-generator" class="page active">
+      <div class="grid">
+        <div class="panel">
+          <h2 class="section-title">輸入區</h2>
+          <p class="section-desc">先貼原始描述，再讓 AI 選模板。如果 AI 失敗，可切換手動模式直接修欄位。</p>
+          <div class="field-grid">
+            <div class="field">
+              <label for="providerSelect">AI 模型供應商</label>
+              <select id="providerSelect">
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai">GPT / OpenAI</option>
+                <option value="gemini">Gemini</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="apiKey">API Key</label>
+              <input id="apiKey" type="password" placeholder="請輸入 API Key">
+            </div>
+          </div>
+          <div class="block">
+            <label for="rawInput">AI 快速輸入</label>
+            <textarea id="rawInput" placeholder="例如：KOSTAL visited IPT on 3/10 to confirm complaints and audit preparation status..."></textarea>
+          </div>
+          <div class="actions">
+            <button id="runAiBtn" class="btn-accent" type="button">AI 產生</button>
+            <button id="manualBtn" class="btn-soft" type="button">手動模式</button>
+            <button id="clearBtn" class="btn-soft" type="button">清空</button>
+          </div>
+          <div id="mainNotice" class="notice hidden" style="margin-top:14px;"></div>
+          <div class="block" style="margin-top:18px;">
+            <label for="templateSelect">模板</label>
+            <select id="templateSelect"></select>
+          </div>
+          <div class="info-box" id="templateInfo"></div>
+          <div class="field-grid" style="margin-top:16px;">
+            <div class="info-box">Project Memory：<span id="memoryCount"></span></div>
+            <div class="info-box">Controlled Glossary：<span id="glossaryCount"></span></div>
+          </div>
+          <div id="fieldGrid" style="margin-top:16px;"></div>
+        </div>
+
+        <div class="panel">
+          <h2 class="section-title">輸出區</h2>
+          <p class="section-desc">中文輸出固定使用中文句型。即使原始輸入是英文，也要盡量轉成中文敘述；專有名詞與難翻譯術語可保留英文。</p>
+          <div class="meta" id="statusMeta"></div>
+          <div id="missingNotice" class="notice warn hidden" style="margin-top:12px;"></div>
+          <div class="block" style="margin-top:18px;">
+            <label>中文 Summary</label>
+            <div id="zhOutput" class="output-box"></div>
+            <div class="actions"><button id="copyZhBtn" class="btn-accent" type="button">複製中文</button></div>
+          </div>
+          <div class="block">
+            <label>English Summary</label>
+            <div id="enOutput" class="output-box mono"></div>
+            <div class="actions">
+              <button id="copyEnBtn" class="btn-sky" type="button">Copy English</button>
+              <button id="copyBothBtn" class="btn-soft" type="button">複製中英文</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-version" class="page">
+      <div class="panel">
+        <h2 class="section-title">版本進版</h2>
+        <p class="section-desc">記錄版號、時間與變更內容。這一頁維持人可讀、工程師可追的格式。</p>
+        <div class="actions" style="margin-bottom:14px;"><button id="openVersionDialogBtn" class="btn-accent" type="button">新增進版紀錄</button></div>
+        <div id="versionLogList" class="log-list"></div>
+      </div>
+    </section>
+
+    <section id="page-project" class="page">
+      <div class="panel">
+        <h2 class="section-title">專案對照表</h2>
+        <p class="section-desc">建議維護方式：平常用表格直接編修，大量更新時用 CSV 匯入。CSV 欄位順序固定為 <span class="mono">site,customer,customerRole,affectedCustomer,product,project</span>。</p>
+        <div class="actions" style="margin-bottom:14px;">
+          <button id="openProjectDialogBtn" class="btn-accent" type="button">新增資料</button>
+          <button id="openProjectCsvBtn" class="btn-soft" type="button">CSV 匯入 / 匯出</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Site</th><th>Customer</th><th>Role</th><th>Affected Customer</th><th>Product</th><th>Project</th><th>操作</th></tr></thead>
+            <tbody id="projectTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-glossary" class="page">
+      <div class="panel">
+        <h2 class="section-title">專有名詞對應</h2>
+        <p class="section-desc">建議不要把 IPC-610 做成整本字典，而是維護「常用且高風險誤譯」的受控術語。建議欄位：中文、英文、分類、IPC-610 條目、備註。</p>
+        <div class="actions" style="margin-bottom:14px;">
+          <button id="openGlossaryDialogBtn" class="btn-accent" type="button">新增術語</button>
+          <button id="openGlossaryCsvBtn" class="btn-soft" type="button">CSV 匯入 / 匯出</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>中文</th><th>英文</th><th>分類</th><th>IPC-610 條目</th><th>備註</th><th>操作</th></tr></thead>
+            <tbody id="glossaryTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modalTitle" style="margin:0;">Dialog</h3>
+        <button id="closeModalBtn" class="btn-soft" type="button">關閉</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEYS = { provider:"cqe_provider", project:"cqe_project_memory", glossary:"cqe_glossary", version:"cqe_version_log", keyDeepSeek:"cqe_key_deepseek", keyOpenAI:"cqe_key_openai", keyGemini:"cqe_key_gemini" };
+    const defaultVersionLogs = [{ version:"v0.2.0-beta", date:"2026-03-09", changes:["改成多頁籤工具：Summary Tool / 版本進版 / 專案對照表 / 專有名詞對應","加入多模型切換：DeepSeek / GPT(OpenAI) / Gemini","API key 改為依供應商分開暫存","加入缺欄位彈窗，允許工程師補齊或填 TBD / NA","加入專案對照表與術語表的 Dialog 編修與 CSV 匯入 / 匯出"] }];
+    const defaultProjectMemory = [
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,WHITE", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"NIO", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,BLACK (NIO FOB)", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"NIO", product:"FOB 汽車鑰匙(黑)", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"NIO", product:"BTM 藍牙模組 (NIO BTM)", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"BYD", product:"BTM 藍牙模組 (BYD UWB)", project:"Pudong" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"JMC", product:"CCU (Center control unit)", project:"Changning" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"JMC", product:"ZCU (Zone Control Unit)", project:"SongJiang" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"Volvo", product:"電動窗控制開關 (CMA5/CMA6)", project:"Hat-trick" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"GWM", product:"門模塊控制器 DCU", project:"Tianchi" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"Mazda", product:"車載充電機 OBC", project:"Qingpu" },
+      { site:"IPT", customer:"Forvia", customerRole:"Tier1", affectedCustomer:"", product:"Car Audio (Shoko Main board)", project:"Shoko" },
+      { site:"IPT", customer:"HCMF", customerRole:"Tier1", affectedCustomer:"", product:"CEER DCU", project:"Jiangshan" }
+    ];
+    const defaultSiteMaster = [
+      { code:"IPT", aliases:["上海", "上海工廠", "Inventec Shanghai", "英業達上海"] },
+      { code:"ITE", aliases:["泰國", "泰國工廠", "Thailand"] },
+      { code:"IME", aliases:["墨西哥", "墨西哥工廠", "Mexico"] },
+      { code:"TAO", aliases:["桃園", "桃園工廠", "Taoyuan"] },
+      { code:"ICZ", aliases:["捷克", "Czech"] }
+    ];
+    const defaultIndicatorRules = [
+      { code:"IQC", meaning:"Tier1 或 OEM 客戶入料檢驗", hints:["incoming", "IQC", "入料", "incoming inspection"] },
+      { code:"VLRR", meaning:"Tier1 或 OEM 客戶產線發現", hints:["line", "line reject", "產線", "assembly line", "LR"] },
+      { code:"0KM", meaning:"OEM 終檢發現", hints:["0km", "end of line", "EOL", "終檢"] },
+      { code:"FR", meaning:"OEM 售後 / 4S 店發現", hints:["field", "4S", "aftermarket", "售後"] }
+    ];
+    const defaultGlossary = [{ zh:"分析中", en:"Under FA", category:"Status", ipc:"", note:"固定責任/狀態用語" },{ zh:"查無異常", en:"NTF (No Trouble Found)", category:"Status", ipc:"", note:"不要自由翻譯" },{ zh:"刮痕", en:"scratch", category:"Defect", ipc:"External condition", note:"" },{ zh:"裂紋", en:"crack", category:"Defect", ipc:"Physical damage", note:"" },{ zh:"短路", en:"short circuit", category:"Failure", ipc:"", note:"" },{ zh:"開路", en:"open circuit", category:"Failure", ipc:"", note:"" },{ zh:"少錫", en:"insufficient solder", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" },{ zh:"多錫", en:"excess solder", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" },{ zh:"冷焊", en:"cold solder", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" },{ zh:"錫珠", en:"solder ball", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" }];
+    const templates = [
+      { id:"audit-plan", category:"Audit/Certification", type:"Plan", label:"Audit / Certification Plan", description:"Use for planned audits or certifications.", sourceTemplate:"[Site]: will conduct <Audit> on <Date>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"audit", label:"Audit", placeholder:"VDA 6.3 audit", required:true },{ key:"date", label:"Date", placeholder:"2026/03/20", required:true }], buildZh:(v)=>`[${v.site}]：預計於 ${v.date} 進行 ${v.audit}。`, buildEn:(v)=>`[${v.site}]: will conduct ${v.audit} on ${v.date}.` },
+      { id:"audit-result", category:"Audit/Certification", type:"Result", label:"Audit / Certification Result", description:"Use for completed audits and outcomes.", sourceTemplate:"[Site]: <Audit> was conducted on <Date>, <Result>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"audit", label:"Audit", placeholder:"VDA 6.3 audit", required:true },{ key:"date", label:"Date", placeholder:"2026/03/20", required:true },{ key:"result", label:"Result", placeholder:"no major findings", required:true }], buildZh:(v)=>`[${v.site}]：已於 ${v.date} 完成 ${v.audit}，${v.result}。`, buildEn:(v)=>`[${v.site}]: ${v.audit} was conducted on ${v.date}, ${v.result}.` },
+      { id:"customer-visit-plan", category:"Customer Visit/VOC", type:"Plan", label:"Customer Visit / VOC Plan", description:"Use for planned customer or OEM visits.", sourceTemplate:"[Site]: <Customer[/OEM]> plans to visit <Site> on <Date> for <Purpose>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer / OEM", placeholder:"KOSTAL", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"purpose", label:"Purpose", placeholder:"confirm complaints and audit preparation status", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 預計於 ${v.date} 拜訪 ${v.site}，目的為 ${v.purpose}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} plans to visit ${v.site} on ${v.date} for ${v.purpose}.` },
+      { id:"customer-visit-result", category:"Customer Visit/VOC", type:"Result", label:"Customer Visit / VOC Result", description:"Use for completed visits and VOC summaries.", sourceTemplate:"[Site]: <Customer[/OEM]> visited <Site> on <DateRange> for <Purpose>, <Outcome>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer / OEM", placeholder:"KOSTAL", required:true },{ key:"dateRange", label:"Date / Date Range", placeholder:"3/10", required:true },{ key:"purpose", label:"Purpose", placeholder:"confirm complaints and audit preparation status", required:true },{ key:"outcome", label:"Outcome", placeholder:"TBD / NA if unknown", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 於 ${v.dateRange} 拜訪 ${v.site}，目的為 ${v.purpose}；結果：${v.outcome}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} visited ${v.site} on ${v.dateRange} for ${v.purpose}, ${v.outcome}.` },
+      { id:"customer-request-plan", category:"Customer Request", type:"Plan", label:"Customer Request Plan", description:"Use for incoming customer requests with next action planning.", sourceTemplate:"[Site]: <Customer> <UrgentVerb> <Site> to <Action> <Tier1/OEM> <Product> <Task> on <Date>; CQE <Role>, plan to <NextStep> on <NextDate>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer", placeholder:"KOSTAL", required:true },{ key:"urgentVerb", label:"Urgent Verb", placeholder:"requested urgently", required:true },{ key:"action", label:"Action", placeholder:"support", required:true },{ key:"tier", label:"Tier1 / OEM", placeholder:"VOLVO", required:true },{ key:"product", label:"Product", placeholder:"window switch", required:true },{ key:"task", label:"Task", placeholder:"onsite sorting", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"role", label:"CQE Role", placeholder:"coordinated factory response", required:true },{ key:"nextStep", label:"Next Step", placeholder:"send 8D plan", required:true },{ key:"nextDate", label:"Next Date", placeholder:"3/11", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 已${v.urgentVerb}${v.site}，要求${v.action}${v.tier} ${v.product} 之 ${v.task}，時間為 ${v.date}；CQE ${v.role}，下一步預計於 ${v.nextDate} ${v.nextStep}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} ${v.urgentVerb} ${v.site} to ${v.action} ${v.tier} ${v.product} ${v.task} on ${v.date}; CQE ${v.role}, plan to ${v.nextStep} on ${v.nextDate}.` },
+      { id:"customer-request-result", category:"Customer Request", type:"Result", label:"Customer Request Result", description:"Use for completed actions after customer requests.", sourceTemplate:"[Site]: <Customer> <UrgentVerb(past)> <Site> to <Action> <Tier1/OEM> <Product> <Task> on <Date>; CQE <Action>, <CompletionStatus>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer", placeholder:"KOSTAL", required:true },{ key:"urgentVerbPast", label:"Urgent Verb (Past)", placeholder:"urgently requested", required:true },{ key:"action", label:"Action", placeholder:"support", required:true },{ key:"tier", label:"Tier1 / OEM", placeholder:"VOLVO", required:true },{ key:"product", label:"Product", placeholder:"window switch", required:true },{ key:"task", label:"Task", placeholder:"onsite sorting", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"cqeAction", label:"CQE Action", placeholder:"deployed sorting support", required:true },{ key:"completionStatus", label:"Completion Status", placeholder:"sorting completed and feedback sent", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 已於 ${v.date}${v.urgentVerbPast}${v.site}，要求${v.action}${v.tier} ${v.product} 之 ${v.task}；CQE 已${v.cqeAction}，${v.completionStatus}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} ${v.urgentVerbPast} ${v.site} to ${v.action} ${v.tier} ${v.product} ${v.task} on ${v.date}; CQE ${v.cqeAction}, ${v.completionStatus}.` },
+      { id:"complaints", category:"Complaints", type:"IQC/VLRR/0KM/FR", label:"Complaints", description:"Use for customer complaints and defect summaries.", sourceTemplate:"[Site] [Category]: <Customer> reported (<Project>) <Product> <Defect> *<Qty> pcs in <Location> on <Date>; <Follow-up actions>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"complaintCategory", label:"Category", placeholder:"VLRR", required:true },{ key:"customer", label:"Direct Customer", placeholder:"KOSTAL", required:true },{ key:"affectedCustomer", label:"Affected Customer / OEM", placeholder:"Volvo / optional", required:false },{ key:"project", label:"Project", placeholder:"Hat-trick", required:true },{ key:"product", label:"Product", placeholder:"電動窗控制開關 (CMA5/CMA6)", required:true },{ key:"defect", label:"Defect", placeholder:"pad 上有異物(錫膏)", required:true },{ key:"qty", label:"Qty", placeholder:"1", required:true },{ key:"location", label:"Finding Location", placeholder:"customer line / IQC / 0KM / FR", required:true },{ key:"date", label:"Date", placeholder:"3/9", required:true },{ key:"followUp", label:"Follow-up Actions", placeholder:"MPE 分析中", required:true }], buildZh:(v)=>`[${v.site}] [${v.complaintCategory}]：${v.customer} 反映${v.affectedCustomer ? `（下游客戶 ${v.affectedCustomer}）` : ""} (${v.project}) ${v.product} 於 ${v.location} 在 ${v.date} 發生 ${v.defect}，數量 *${v.qty} pcs；${v.followUp}。`, buildEn:(v)=>`[${v.site}] [${v.complaintCategory}]: ${v.customer} reported${v.affectedCustomer ? ` for downstream customer ${v.affectedCustomer}` : ""} (${v.project}) ${v.product} ${v.defect} *${v.qty} pcs in ${v.location} on ${v.date}; ${v.followUp}.` },
+      { id:"improvement-closure", category:"Improvement/Closure", type:"NA", label:"Improvement / Closure", description:"Use for major improvement milestones or closure notes.", sourceTemplate:"[Site]: <Task> -- <Date> <Status>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"task", label:"Task", placeholder:"line audit finding closure", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"status", label:"Status", placeholder:"completed", required:true }], buildZh:(v)=>`[${v.site}]：${v.task}，於 ${v.date} ${v.status}。`, buildEn:(v)=>`[${v.site}]: ${v.task} -- ${v.date} ${v.status}.` },
+      { id:"ongoing-activity", category:"Ongoing Activity", type:"NA", label:"Ongoing Activity", description:"Use for ongoing project or improvement activities.", sourceTemplate:"[Site]: <Project>: <Action> from <StartDate> - <Status>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"project", label:"Project", placeholder:"Customer VOC reduction", required:true },{ key:"action", label:"Action", placeholder:"weekly defect review launched", required:true },{ key:"startDate", label:"Start Date", placeholder:"3/1", required:true },{ key:"status", label:"Status", placeholder:"in progress", required:true }], buildZh:(v)=>`[${v.site}]：${v.project}：自 ${v.startDate} 起執行 ${v.action}，目前 ${v.status}。`, buildEn:(v)=>`[${v.site}]: ${v.project}: ${v.action} from ${v.startDate} - ${v.status}.` },
+      { id:"new-project-kickoff", category:"New Project Kick-off", type:"NA", label:"New Project Kick-off", description:"Use for new project start records.", sourceTemplate:"[Site]: <Customer>/<Product> (<ProjectName>) kicked off on <Date>; <Status>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer", placeholder:"KOSTAL", required:true },{ key:"product", label:"Product", placeholder:"window switch", required:true },{ key:"projectName", label:"Project Name", placeholder:"Jiading", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"status", label:"Status", placeholder:"customer requirement review completed", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} / ${v.product} (${v.projectName}) 已於 ${v.date} 啟動；${v.status}。`, buildEn:(v)=>`[${v.site}]: ${v.customer}/${v.product} (${v.projectName}) kicked off on ${v.date}; ${v.status}.` },
+      { id:"people-development", category:"People Development", type:"NA", label:"People Development", description:"Use for training and people development records.", sourceTemplate:"[Dept]: <Training> from <DateRange>; <Person> <Result>.", fields:[{ key:"site", label:"Dept / Site", placeholder:"CQE", required:true },{ key:"training", label:"Training", placeholder:"IPC-610 refresh training", required:true },{ key:"dateRange", label:"Date Range", placeholder:"3/10-3/11", required:true },{ key:"person", label:"Person", placeholder:"3 engineers", required:true },{ key:"result", label:"Result", placeholder:"completed certification", required:true }], buildZh:(v)=>`[${v.site}]：${v.training} 於 ${v.dateRange} 進行；${v.person}${v.result}。`, buildEn:(v)=>`[${v.site}]: ${v.training} from ${v.dateRange}; ${v.person} ${v.result}.` }
+    ];
+
+    const providerConfig = {
+      deepseek: {
+        label: "DeepSeek",
+        keyStorage: STORAGE_KEYS.keyDeepSeek,
+        placeholder: "請輸入 DeepSeek API Key",
+        buildRequest(systemPrompt, input, apiKey) {
+          return {
+            url: "https://api.deepseek.com/chat/completions",
+            options: {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+              body: JSON.stringify({
+                model: "deepseek-chat",
+                temperature: 0.1,
+                response_format: { type: "json_object" },
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: input }
+                ]
+              })
+            }
+          };
+        },
+        parseResponse(data) { return data?.choices?.[0]?.message?.content ?? "{}"; }
+      },
+      openai: {
+        label: "GPT / OpenAI",
+        keyStorage: STORAGE_KEYS.keyOpenAI,
+        placeholder: "請輸入 OpenAI API Key",
+        buildRequest(systemPrompt, input, apiKey) {
+          return {
+            url: "https://api.openai.com/v1/chat/completions",
+            options: {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+              body: JSON.stringify({
+                model: "gpt-4o-mini",
+                temperature: 0.1,
+                response_format: { type: "json_object" },
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: input }
+                ]
+              })
+            }
+          };
+        },
+        parseResponse(data) { return data?.choices?.[0]?.message?.content ?? "{}"; }
+      },
+      gemini: {
+        label: "Gemini",
+        keyStorage: STORAGE_KEYS.keyGemini,
+        placeholder: "請輸入 Gemini API Key",
+        buildRequest(systemPrompt, input, apiKey) {
+          return {
+            url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+            options: {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
+                contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\nUser input:\n${input}` }] }]
+              })
+            }
+          };
+        },
+        parseResponse(data) { return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}"; }
+      }
+    };
+
+    const el = {
+      tabs: Array.from(document.querySelectorAll(".tab")),
+      pages: {
+        generator: document.getElementById("page-generator"),
+        version: document.getElementById("page-version"),
+        project: document.getElementById("page-project"),
+        glossary: document.getElementById("page-glossary")
+      },
+      providerSelect: document.getElementById("providerSelect"),
+      apiKey: document.getElementById("apiKey"),
+      rawInput: document.getElementById("rawInput"),
+      runAiBtn: document.getElementById("runAiBtn"),
+      manualBtn: document.getElementById("manualBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      templateSelect: document.getElementById("templateSelect"),
+      templateInfo: document.getElementById("templateInfo"),
+      fieldGrid: document.getElementById("fieldGrid"),
+      memoryCount: document.getElementById("memoryCount"),
+      glossaryCount: document.getElementById("glossaryCount"),
+      zhOutput: document.getElementById("zhOutput"),
+      enOutput: document.getElementById("enOutput"),
+      mainNotice: document.getElementById("mainNotice"),
+      missingNotice: document.getElementById("missingNotice"),
+      statusMeta: document.getElementById("statusMeta"),
+      copyZhBtn: document.getElementById("copyZhBtn"),
+      copyEnBtn: document.getElementById("copyEnBtn"),
+      copyBothBtn: document.getElementById("copyBothBtn"),
+      versionLogList: document.getElementById("versionLogList"),
+      projectTableBody: document.getElementById("projectTableBody"),
+      glossaryTableBody: document.getElementById("glossaryTableBody"),
+      openVersionDialogBtn: document.getElementById("openVersionDialogBtn"),
+      openProjectDialogBtn: document.getElementById("openProjectDialogBtn"),
+      openProjectCsvBtn: document.getElementById("openProjectCsvBtn"),
+      openGlossaryDialogBtn: document.getElementById("openGlossaryDialogBtn"),
+      openGlossaryCsvBtn: document.getElementById("openGlossaryCsvBtn"),
+      modalBackdrop: document.getElementById("modalBackdrop"),
+      modalTitle: document.getElementById("modalTitle"),
+      modalBody: document.getElementById("modalBody"),
+      closeModalBtn: document.getElementById("closeModalBtn")
+    };
+
+    let state = {
+      provider: "deepseek",
+      currentTemplateId: templates[0].id,
+      fieldValues: {},
+      zhHints: {},
+      aiConfidence: null,
+      projectMemory: loadJson(STORAGE_KEYS.project, defaultProjectMemory),
+      glossary: loadJson(STORAGE_KEYS.glossary, defaultGlossary),
+      versionLogs: loadJson(STORAGE_KEYS.version, defaultVersionLogs)
+    };
+
+    function loadJson(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(fallback));
+      } catch {
+        return JSON.parse(JSON.stringify(fallback));
+      }
+    }
+
+    function saveJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+    function getTemplateById(id) { return templates.find((item) => item.id === id) || templates[0]; }
+    function defaultValues(templateId) { return Object.fromEntries(getTemplateById(templateId).fields.map((field) => [field.key, ""])); }
+    function activeProvider() { return providerConfig[state.provider]; }
+
+    function setNotice(target, message, kind) {
+      if (!message) {
+        target.className = "notice hidden";
+        target.textContent = "";
+        return;
+      }
+      target.textContent = message;
+      target.className = `notice ${kind || ""}`;
+    }
+
+    function switchPage(pageName) {
+      Object.entries(el.pages).forEach(([name, page]) => page.classList.toggle("active", name === pageName));
+      el.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.page === pageName));
+    }
+
+    function renderTemplateSelect() {
+      el.templateSelect.innerHTML = templates.map((template) => `<option value="${template.id}">${template.category} / ${template.type} / ${template.label}</option>`).join("");
+      el.templateSelect.value = state.currentTemplateId;
+    }
+
+    function renderTemplateInfo() {
+      const template = getTemplateById(state.currentTemplateId);
+      el.templateInfo.innerHTML = `<div><strong>${template.description}</strong></div><div class="small" style="margin-top:8px;">Source template: <span class="mono">${template.sourceTemplate}</span></div>`;
+    }
+
+    function renderFields() {
+      const template = getTemplateById(state.currentTemplateId);
+      const grid = document.createElement("div");
+      grid.className = "field-grid";
+      template.fields.forEach((field) => {
+        const box = document.createElement("div");
+        box.className = "field";
+        box.innerHTML = `<label for="field-${field.key}">${field.label}${field.required ? ' <span class="small">*</span>' : ""}</label><input id="field-${field.key}" placeholder="${field.placeholder}">`;
+        grid.appendChild(box);
+      });
+      el.fieldGrid.innerHTML = "";
+      el.fieldGrid.appendChild(grid);
+      template.fields.forEach((field) => {
+        const input = document.getElementById(`field-${field.key}`);
+        input.value = state.fieldValues[field.key] || "";
+        input.addEventListener("input", (event) => {
+          state.fieldValues[field.key] = event.target.value;
+          if (!event.target.value.trim()) delete state.zhHints[field.key];
+          renderSummaries();
+        });
+      });
+    }
+
+    function setTemplate(templateId, nextValues, nextZhHints) {
+      state.currentTemplateId = templateId;
+      state.fieldValues = { ...defaultValues(templateId), ...(nextValues || {}) };
+      state.zhHints = { ...(nextZhHints || {}) };
+      el.templateSelect.value = templateId;
+      renderTemplateInfo();
+      renderFields();
+      renderSummaries();
+    }
+
+    function normalizeEnValue(field, rawValue) {
+      const value = (rawValue || "").trim();
+      return value || (field.required ? "TBD" : "");
+    }
+
+    function normalizeZhValue(field, rawValue) {
+      const value = (rawValue || "").trim();
+      return value || (field.required ? "TBD" : "");
+    }
+
+    function localizeZhValue(field, rawValue) {
+      const direct = (state.zhHints[field.key] || "").trim();
+      if (direct) return direct;
+      const current = (rawValue || "").trim();
+      if (!current) return field.required ? "TBD" : "";
+      const lower = current.toLowerCase();
+      if (lower === "tbd") return "TBD";
+      if (lower === "na") return "NA";
+      const glossaryMatch = state.glossary.find((item) => item.en.toLowerCase() === lower || item.zh === current);
+      return glossaryMatch ? glossaryMatch.zh : current;
+    }
+
+    function computeMissingFields() {
+      const template = getTemplateById(state.currentTemplateId);
+      return template.fields.filter((field) => field.required && !(state.fieldValues[field.key] || "").trim());
+    }
+
+    function renderStatusMeta(missingFields) {
+      const items = [];
+      if (state.aiConfidence !== null) items.push(`<div class="meta-item">AI confidence: ${(state.aiConfidence * 100).toFixed(0)}%</div>`);
+      items.push(`<div class="meta-item">Template: ${getTemplateById(state.currentTemplateId).label}</div>`);
+      items.push(`<div class="meta-item">${missingFields.length ? `Missing: ${missingFields.map((item) => item.label).join("、")}` : "Required fields completed"}</div>`);
+      el.statusMeta.innerHTML = items.join("");
+    }
+
+    function renderSummaries() {
+      const template = getTemplateById(state.currentTemplateId);
+      const missingFields = computeMissingFields();
+      const zhValues = {};
+      const enValues = {};
+      template.fields.forEach((field) => {
+        zhValues[field.key] = normalizeZhValue(field, localizeZhValue(field, state.fieldValues[field.key]));
+        enValues[field.key] = normalizeEnValue(field, state.fieldValues[field.key]);
+      });
+      el.zhOutput.textContent = template.buildZh(zhValues);
+      el.enOutput.textContent = template.buildEn(enValues);
+      renderStatusMeta(missingFields);
+      if (missingFields.length) setNotice(el.missingNotice, `有必填資訊缺失：${missingFields.map((field) => field.label).join("、")}。請補齊，或填入 TBD / NA。`, "warn");
+      else setNotice(el.missingNotice, "", "");
+    }
+
+    function saveProviderKey() { localStorage.setItem(activeProvider().keyStorage, el.apiKey.value.trim()); }
+
+    function loadProviderState() {
+      state.provider = localStorage.getItem(STORAGE_KEYS.provider) || "deepseek";
+      el.providerSelect.value = state.provider;
+      el.apiKey.placeholder = activeProvider().placeholder;
+      el.apiKey.value = localStorage.getItem(activeProvider().keyStorage) || "";
+    }
+
+    function buildTemplateCatalogText() {
+      return templates.map((template) => {
+        const fields = template.fields.map((field) => `${field.key}${field.required ? " (required)" : ""}`).join(", ");
+        return [`templateId: ${template.id}`, `category: ${template.category}`, `type: ${template.type}`, `description: ${template.description}`, `sourceTemplate: ${template.sourceTemplate}`, `fields: ${fields}`].join("\n");
+      }).join("\n\n");
+    }
+
+    function buildProjectMemoryText() { return state.projectMemory.map((item) => `${item.site} | ${item.customer} | ${item.customerRole} | ${item.affectedCustomer || "-"} | ${item.product} | ${item.project}`).join("\n"); }
+    function buildGlossaryText() { return state.glossary.map((item) => `${item.zh} => ${item.en}${item.category ? ` [${item.category}]` : ""}`).join("\n"); }
+    function buildSiteMasterText() { return defaultSiteMaster.map((item) => `${item.code}: ${item.aliases.join(", ")}`).join("\n"); }
+    function buildIndicatorRulesText() { return defaultIndicatorRules.map((item) => `${item.code}: ${item.meaning}; hints=${item.hints.join(", ")}`).join("\n"); }
+
+    async function callAi(input) {
+      const apiKey = el.apiKey.value.trim();
+      if (!apiKey) throw new Error("未提供 API Key");
+      const prompt = [
+        "You are an expert CQE weekly report assistant.",
+        "You are a patient CQE reviewer and coach.",
+        "First review the engineer text carefully, then choose the best templateId from the catalog.",
+        "Extract structured field values from the user input.",
+        "Do not guess site from project name. Site must be an Inventec site code only, such as IPT / ITE / IME / TAO / ICZ.",
+        "Do not use downstream OEM as the direct customer when the notifier is Tier1. In complaints, customer means the direct complainant to Inventec; downstream OEM should go to affectedCustomer.",
+        "For complaintCategory, select one of IQC / VLRR / 0KM / FR based on the finding stage definitions. If you cannot determine it, leave it empty and ask the engineer to confirm.",
+        "If the original input is in English, also provide Chinese display values for non-proper-noun fields when possible.",
+        "Do not fabricate precise facts. Unknown required fields should be empty string.",
+        "Allowed fallback text for unknown user-confirmed fields: TBD or NA.",
+        "Return review notes that tell the engineer what is missing or what assumption is risky.",
+        "Inventec site master:",
+        buildSiteMasterText(),
+        "Indicator rules:",
+        buildIndicatorRulesText(),
+        "Project memory:",
+        buildProjectMemoryText(),
+        "Controlled glossary:",
+        buildGlossaryText(),
+        "Template catalog:",
+        buildTemplateCatalogText(),
+        'Return strict JSON only with this shape: {"templateId":"...","values":{"fieldKey":"..."},"valuesZh":{"fieldKey":"..."},"confidence":0.0,"notes":["..."],"reviewerQuestions":["..."]}'
+      ].join("\n\n");
+      const request = activeProvider().buildRequest(prompt, input, apiKey);
+      const response = await fetch(request.url, request.options);
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      return JSON.parse(activeProvider().parseResponse(data));
+    }
+
+    function openModal(title, html, afterOpen) {
+      el.modalTitle.textContent = title;
+      el.modalBody.innerHTML = html;
+      el.modalBackdrop.classList.add("active");
+      if (afterOpen) afterOpen();
+    }
+
+    function closeModal() {
+      el.modalBackdrop.classList.remove("active");
+      el.modalBody.innerHTML = "";
+    }
+
+    function openMissingDialog(missingFields) {
+      const rows = missingFields.map((field) => `<div class="field"><label for="missing-${field.key}">${field.label}</label><input id="missing-${field.key}" value="${(state.fieldValues[field.key] || "").replace(/"/g, "&quot;")}" placeholder="可填 TBD 或 NA"></div>`).join("");
+      openModal("補齊缺失資訊", `<p class="section-desc">下列欄位為必填。若目前沒有資訊，可填入 <span class="mono">TBD</span> 或 <span class="mono">NA</span>。</p><div class="field-grid">${rows}</div><div class="actions"><button id="saveMissingBtn" class="btn-accent" type="button">儲存並更新</button></div>`, () => {
+        document.getElementById("saveMissingBtn").addEventListener("click", () => {
+          missingFields.forEach((field) => { state.fieldValues[field.key] = document.getElementById(`missing-${field.key}`).value.trim(); });
+          renderFields();
+          renderSummaries();
+          closeModal();
+          setNotice(el.mainNotice, "缺失欄位已更新。", "good");
+        });
+      });
+    }
+
+    function openVersionDialog() {
+      openModal("新增進版紀錄", `<div class="field-grid"><div class="field"><label for="versionNo">版號</label><input id="versionNo" placeholder="v0.2.1-beta"></div><div class="field"><label for="versionDate">日期</label><input id="versionDate" placeholder="2026-03-10"></div></div><div class="field"><label for="versionChanges">變更內容</label><textarea id="versionChanges" placeholder="一行一項變更"></textarea></div><div class="actions"><button id="saveVersionBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
+        document.getElementById("saveVersionBtn").addEventListener("click", () => {
+          const version = document.getElementById("versionNo").value.trim();
+          const date = document.getElementById("versionDate").value.trim();
+          const changes = document.getElementById("versionChanges").value.split("\n").map((item) => item.trim()).filter(Boolean);
+          if (!version || !date || !changes.length) return;
+          state.versionLogs.unshift({ version, date, changes });
+          saveJson(STORAGE_KEYS.version, state.versionLogs);
+          renderVersionLogs();
+          closeModal();
+        });
+      });
+    }
+
+    function openProjectDialog(index = null) {
+      const item = index === null ? { site:"IPT", customer:"", customerRole:"Tier1", affectedCustomer:"", product:"", project:"" } : state.projectMemory[index];
+      openModal(index === null ? "新增專案對照" : "修改專案對照", `<div class="field-grid"><div class="field"><label for="projectSite">Site</label><input id="projectSite" value="${item.site.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectCustomer">Customer</label><input id="projectCustomer" value="${item.customer.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="projectRole">Customer Role</label><input id="projectRole" value="${item.customerRole.replace(/"/g, "&quot;")}" placeholder="Tier1 / OEM"></div><div class="field"><label for="projectAffected">Affected Customer</label><input id="projectAffected" value="${(item.affectedCustomer || "").replace(/"/g, "&quot;")}" placeholder="Volvo / optional"></div></div><div class="field-grid"><div class="field"><label for="projectProduct">Product</label><input id="projectProduct" value="${item.product.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectName">Project</label><input id="projectName" value="${item.project.replace(/"/g, "&quot;")}"></div></div><div class="actions"><button id="saveProjectBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
+        document.getElementById("saveProjectBtn").addEventListener("click", () => {
+          const next = { site:document.getElementById("projectSite").value.trim(), customer:document.getElementById("projectCustomer").value.trim(), customerRole:document.getElementById("projectRole").value.trim(), affectedCustomer:document.getElementById("projectAffected").value.trim(), product:document.getElementById("projectProduct").value.trim(), project:document.getElementById("projectName").value.trim() };
+          if (!next.site || !next.customer || !next.product || !next.project) return;
+          if (index === null) state.projectMemory.push(next); else state.projectMemory[index] = next;
+          saveJson(STORAGE_KEYS.project, state.projectMemory);
+          renderProjectTable();
+          refreshCounts();
+          closeModal();
+        });
+      });
+    }
+
+    function openGlossaryDialog(index = null) {
+      const item = index === null ? { zh:"", en:"", category:"", ipc:"", note:"" } : state.glossary[index];
+      openModal(index === null ? "新增專有名詞" : "修改專有名詞", `<div class="field-grid"><div class="field"><label for="termZh">中文</label><input id="termZh" value="${item.zh.replace(/"/g, "&quot;")}"></div><div class="field"><label for="termEn">英文</label><input id="termEn" value="${item.en.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="termCategory">分類</label><input id="termCategory" value="${item.category.replace(/"/g, "&quot;")}" placeholder="Defect / Status / Soldering"></div><div class="field"><label for="termIpc">IPC-610 條目</label><input id="termIpc" value="${item.ipc.replace(/"/g, "&quot;")}" placeholder="例如 IPC-610 solder criteria"></div></div><div class="field"><label for="termNote">備註</label><input id="termNote" value="${item.note.replace(/"/g, "&quot;")}"></div><div class="actions"><button id="saveGlossaryBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
+        document.getElementById("saveGlossaryBtn").addEventListener("click", () => {
+          const next = { zh:document.getElementById("termZh").value.trim(), en:document.getElementById("termEn").value.trim(), category:document.getElementById("termCategory").value.trim(), ipc:document.getElementById("termIpc").value.trim(), note:document.getElementById("termNote").value.trim() };
+          if (!next.zh || !next.en) return;
+          if (index === null) state.glossary.push(next); else state.glossary[index] = next;
+          saveJson(STORAGE_KEYS.glossary, state.glossary);
+          renderGlossaryTable();
+          refreshCounts();
+          closeModal();
+        });
+      });
+    }
+
+    function openCsvDialog(type) {
+      const isProject = type === "project";
+      const header = isProject ? "site,customer,customerRole,affectedCustomer,product,project" : "zh,en,category,ipc,note";
+      const rows = isProject ? state.projectMemory.map((item) => `${item.site},${item.customer},${item.customerRole || ""},${item.affectedCustomer || ""},${item.product},${item.project}`).join("\n") : state.glossary.map((item) => `${item.zh},${item.en},${item.category},${item.ipc},${item.note}`).join("\n");
+      openModal(isProject ? "專案對照表 CSV" : "專有名詞 CSV", `<p class="section-desc">第一行欄位固定為 <span class="mono">${header}</span>。可直接貼上 CSV 覆蓋匯入，或複製下方內容匯出。</p><div class="field"><label for="csvData">CSV</label><textarea id="csvData" style="min-height:260px;">${header}\n${rows}</textarea></div><div class="actions"><button id="importCsvBtn" class="btn-accent" type="button">匯入覆蓋</button><button id="copyCsvBtn" class="btn-soft" type="button">複製 CSV</button></div>`, () => {
+        document.getElementById("copyCsvBtn").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("csvData").value); });
+        document.getElementById("importCsvBtn").addEventListener("click", () => {
+          const lines = document.getElementById("csvData").value.split("\n").map((line) => line.trim()).filter(Boolean);
+          if (lines.length < 2) return;
+          const dataLines = lines.slice(1);
+          if (isProject) {
+            state.projectMemory = dataLines.map((line) => { const [site="", customer="", customerRole="", affectedCustomer="", product="", project=""] = line.split(","); return { site:site.trim(), customer:customer.trim(), customerRole:customerRole.trim(), affectedCustomer:affectedCustomer.trim(), product:product.trim(), project:project.trim() }; }).filter((item) => item.site && item.customer && item.product && item.project);
+            saveJson(STORAGE_KEYS.project, state.projectMemory);
+            renderProjectTable();
+          } else {
+            state.glossary = dataLines.map((line) => { const [zh="", en="", category="", ipc="", note=""] = line.split(","); return { zh:zh.trim(), en:en.trim(), category:category.trim(), ipc:ipc.trim(), note:note.trim() }; }).filter((item) => item.zh && item.en);
+            saveJson(STORAGE_KEYS.glossary, state.glossary);
+            renderGlossaryTable();
+          }
+          refreshCounts();
+          closeModal();
+        });
+      });
+    }
+
+    function renderVersionLogs() {
+      el.versionLogList.innerHTML = state.versionLogs.map((log) => `<div class="log-item"><div class="log-head"><div class="log-version">${log.version}</div><div class="small">${log.date}</div></div><div>${log.changes.map((item) => `<div>• ${item}</div>`).join("")}</div></div>`).join("");
+    }
+
+    function renderProjectTable() {
+      el.projectTableBody.innerHTML = state.projectMemory.map((item, index) => `<tr><td>${item.site}</td><td>${item.customer}</td><td>${item.customerRole || ""}</td><td>${item.affectedCustomer || ""}</td><td>${item.product}</td><td>${item.project}</td><td><div class="actions"><button class="btn-soft" type="button" data-project-edit="${index}">修改</button><button class="btn-danger" type="button" data-project-del="${index}">刪除</button></div></td></tr>`).join("");
+      el.projectTableBody.querySelectorAll("[data-project-edit]").forEach((button) => button.addEventListener("click", () => openProjectDialog(Number(button.dataset.projectEdit))));
+      el.projectTableBody.querySelectorAll("[data-project-del]").forEach((button) => button.addEventListener("click", () => { state.projectMemory.splice(Number(button.dataset.projectDel), 1); saveJson(STORAGE_KEYS.project, state.projectMemory); renderProjectTable(); refreshCounts(); }));
+    }
+
+    function renderGlossaryTable() {
+      el.glossaryTableBody.innerHTML = state.glossary.map((item, index) => `<tr><td>${item.zh}</td><td>${item.en}</td><td>${item.category || ""}</td><td>${item.ipc || ""}</td><td>${item.note || ""}</td><td><div class="actions"><button class="btn-soft" type="button" data-glossary-edit="${index}">修改</button><button class="btn-danger" type="button" data-glossary-del="${index}">刪除</button></div></td></tr>`).join("");
+      el.glossaryTableBody.querySelectorAll("[data-glossary-edit]").forEach((button) => button.addEventListener("click", () => openGlossaryDialog(Number(button.dataset.glossaryEdit))));
+      el.glossaryTableBody.querySelectorAll("[data-glossary-del]").forEach((button) => button.addEventListener("click", () => { state.glossary.splice(Number(button.dataset.glossaryDel), 1); saveJson(STORAGE_KEYS.glossary, state.glossary); renderGlossaryTable(); refreshCounts(); }));
+    }
+
+    function refreshCounts() {
+      el.memoryCount.textContent = `${state.projectMemory.length} 筆`;
+      el.glossaryCount.textContent = `${state.glossary.length} 筆`;
+    }
+
+    async function copyText(text, message) {
+      try { await navigator.clipboard.writeText(text); setNotice(el.mainNotice, message, "good"); }
+      catch (error) { setNotice(el.mainNotice, `複製失敗：${error.message}`, "bad"); }
+    }
+
+    async function handleAiGenerate() {
+      const input = el.rawInput.value.trim();
+      if (!input) { setNotice(el.mainNotice, "請先貼上工程師描述、客訴、會議摘要或拜訪紀錄。", "bad"); return; }
+      el.runAiBtn.disabled = true;
+      el.runAiBtn.textContent = `${activeProvider().label} 分析中...`;
+      setNotice(el.mainNotice, "", "");
+      state.aiConfidence = null;
+      try {
+        saveProviderKey();
+        const parsed = await callAi(input);
+        const templateId = getTemplateById(parsed.templateId || templates[0].id).id;
+        state.aiConfidence = typeof parsed.confidence === "number" ? parsed.confidence : null;
+        setTemplate(templateId, parsed.values || {}, parsed.valuesZh || {});
+        const missingFields = computeMissingFields();
+        const notes = Array.isArray(parsed.notes) && parsed.notes.length ? ` AI notes: ${parsed.notes.join(" | ")}` : "";
+        const reviewerQuestions = Array.isArray(parsed.reviewerQuestions) && parsed.reviewerQuestions.length ? ` 請確認：${parsed.reviewerQuestions.join(" | ")}` : "";
+        setNotice(el.mainNotice, `${activeProvider().label} 已完成模板判斷與欄位帶入。${notes}${reviewerQuestions}`, reviewerQuestions ? "warn" : "good");
+        if (missingFields.length) openMissingDialog(missingFields);
+      } catch (error) {
+        setNotice(el.mainNotice, `${activeProvider().label} 呼叫失敗：${error.message}。若公司網域限制直連模型，請改用手動模式。`, "bad");
+      } finally {
+        el.runAiBtn.disabled = false;
+        el.runAiBtn.textContent = "AI 產生";
+      }
+    }
+
+    function initEvents() {
+      el.tabs.forEach((tab) => tab.addEventListener("click", () => switchPage(tab.dataset.page)));
+      el.providerSelect.addEventListener("change", () => {
+        state.provider = el.providerSelect.value;
+        localStorage.setItem(STORAGE_KEYS.provider, state.provider);
+        el.apiKey.placeholder = activeProvider().placeholder;
+        el.apiKey.value = localStorage.getItem(activeProvider().keyStorage) || "";
+      });
+      el.apiKey.addEventListener("change", saveProviderKey);
+      el.apiKey.addEventListener("input", saveProviderKey);
+      el.templateSelect.addEventListener("change", () => { state.aiConfidence = null; setTemplate(el.templateSelect.value, {}, {}); });
+      el.runAiBtn.addEventListener("click", handleAiGenerate);
+      el.manualBtn.addEventListener("click", () => {
+        const missingFields = computeMissingFields();
+        setNotice(el.mainNotice, "已切換手動模式。", "good");
+        if (missingFields.length) openMissingDialog(missingFields);
+      });
+      el.clearBtn.addEventListener("click", () => {
+        el.rawInput.value = "";
+        state.aiConfidence = null;
+        setTemplate(state.currentTemplateId, {}, {});
+        setNotice(el.mainNotice, "", "");
+      });
+      el.copyZhBtn.addEventListener("click", () => copyText(el.zhOutput.textContent, "已複製中文 Summary。"));
+      el.copyEnBtn.addEventListener("click", () => copyText(el.enOutput.textContent, "已複製 English Summary。"));
+      el.copyBothBtn.addEventListener("click", () => copyText(`${el.zhOutput.textContent}\n${el.enOutput.textContent}`, "已複製中英文 Summary。"));
+      el.openVersionDialogBtn.addEventListener("click", openVersionDialog);
+      el.openProjectDialogBtn.addEventListener("click", () => openProjectDialog());
+      el.openProjectCsvBtn.addEventListener("click", () => openCsvDialog("project"));
+      el.openGlossaryDialogBtn.addEventListener("click", () => openGlossaryDialog());
+      el.openGlossaryCsvBtn.addEventListener("click", () => openCsvDialog("glossary"));
+      el.closeModalBtn.addEventListener("click", closeModal);
+      el.modalBackdrop.addEventListener("click", (event) => { if (event.target === el.modalBackdrop) closeModal(); });
+    }
+
+    function init() {
+      loadProviderState();
+      renderTemplateSelect();
+      refreshCounts();
+      renderVersionLogs();
+      renderProjectTable();
+      renderGlossaryTable();
+      setTemplate(state.currentTemplateId, {}, {});
+      initEvents();
+    }
+
+    init();
+  </script>
+</body>
+</html>
