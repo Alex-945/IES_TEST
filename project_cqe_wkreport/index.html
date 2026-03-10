@@ -35,8 +35,11 @@
     input:focus,textarea:focus,select:focus { border-color:rgba(244,176,0,.56); box-shadow:0 0 0 3px rgba(244,176,0,.16); }
     .input-risk { border-color:rgba(215,135,39,.7) !important; box-shadow:0 0 0 3px rgba(215,135,39,.14); background:#fffaf0; }
     .input-missing { border-color:rgba(214,90,90,.72) !important; box-shadow:0 0 0 3px rgba(214,90,90,.14); background:#fff5f5; }
-    button { border:0; border-radius:14px; padding:11px 15px; font:inherit; font-weight:700; cursor:pointer; }
+    button { border:0; border-radius:14px; padding:11px 15px; font:inherit; font-weight:700; cursor:pointer; transition:transform .14s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease; }
     button:disabled { opacity:.6; cursor:not-allowed; }
+    button:not(:disabled):hover { transform:translateY(-1px); box-shadow:0 10px 18px rgba(36,66,102,.12); }
+    button:not(:disabled):active { transform:translateY(1px) scale(.98); box-shadow:0 4px 10px rgba(36,66,102,.10); }
+    button:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(85,183,217,.22); }
     .btn-accent { background:var(--accent); color:#2a1b00; }
     .btn-soft { background:rgba(255,255,255,.78); color:var(--text); border:1px solid var(--line); }
     .btn-sky { background:var(--accent2); color:#08212b; }
@@ -84,7 +87,7 @@
       </div>
       <div class="tab-row">
         <button class="tab active" data-page="generator">Summary Tool</button>
-        <button class="tab" data-page="version" data-protected="true">版本進版</button>
+        <button class="tab" data-page="version" data-protected="true">後台維護</button>
         <button class="tab" data-page="project" data-protected="true">專案對照表</button>
         <button class="tab" data-page="glossary" data-protected="true">專有名詞對應</button>
       </div>
@@ -122,10 +125,6 @@
             <div class="info-box">Project Memory：<span id="memoryCount"></span></div>
             <div class="info-box">Controlled Glossary：<span id="glossaryCount"></span></div>
           </div>
-          <div class="field-grid" style="margin-top:14px;">
-            <div class="info-box">共享資料夾：<span id="sharedStatusText">未連線</span></div>
-            <div class="actions"><button id="connectSharedBtn" class="btn-soft" type="button">連線共享資料夾</button><button id="reloadSharedBtn" class="btn-soft" type="button">重新載入共享資料</button></div>
-          </div>
           <div id="fieldGrid" style="margin-top:16px;"></div>
         </div>
 
@@ -153,7 +152,7 @@
 
     <section id="page-version" class="page">
       <div class="panel">
-        <h2 class="section-title">版本進版 / API 維護</h2>
+        <h2 class="section-title">後台維護</h2>
         <p class="section-desc">這一頁由維護者管理版號、時間、變更內容與共享 API 設定。</p>
         <div class="actions" style="margin-bottom:14px;"><button id="openVersionDialogBtn" class="btn-accent" type="button">新增進版紀錄</button></div>
         <div id="versionLogList" class="log-list"></div>
@@ -255,7 +254,7 @@
       defaultProvider: "deepseek",
       providers: {
         deepseek: { enabled:true, baseUrl:"https://api.deepseek.com/chat/completions", model:"deepseek-chat", apiKey:"" },
-        openai: { enabled:true, baseUrl:"https://api.openai.com/v1/chat/completions", model:"gpt-4o-mini", apiKey:"" },
+        openai: { enabled:true, baseUrl:"https://aoai-aebu-aqad2-027.openai.azure.com/openai/responses?api-version=2025-04-01-preview", model:"gpt-5.2", apiKey:"" },
         gemini: { enabled:true, baseUrl:"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", model:"gemini-2.0-flash", apiKey:"" }
       },
       updatedAt: "",
@@ -300,27 +299,28 @@
         parseResponse(data) { return data?.choices?.[0]?.message?.content ?? "{}"; }
       },
       openai: {
-        label: "GPT / OpenAI",
+        label: "Azure OpenAI (gpt-5.2)",
         placeholder: "請輸入 OpenAI API Key",
         buildRequest(systemPrompt, input, apiKey) {
           return {
             url: state.apiConfig.providers.openai.baseUrl || defaultApiConfig.providers.openai.baseUrl,
             options: {
               method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+              headers: { "Content-Type": "application/json", "api-key": apiKey },
               body: JSON.stringify({
                 model: state.apiConfig.providers.openai.model || defaultApiConfig.providers.openai.model,
                 temperature: 0.1,
-                response_format: { type: "json_object" },
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: input }
-                ]
+                instructions: systemPrompt,
+                input
               })
             }
           };
         },
-        parseResponse(data) { return data?.choices?.[0]?.message?.content ?? "{}"; }
+        parseResponse(data) {
+          return data?.output_text
+            ?? data?.output?.find?.((item) => item.type === "message")?.content?.find?.((part) => part.type === "output_text")?.text
+            ?? "{}";
+        }
       },
       gemini: {
         label: "Gemini",
@@ -379,9 +379,6 @@
       openProjectCsvBtn: document.getElementById("openProjectCsvBtn"),
       openGlossaryDialogBtn: document.getElementById("openGlossaryDialogBtn"),
       openGlossaryCsvBtn: document.getElementById("openGlossaryCsvBtn"),
-      connectSharedBtn: document.getElementById("connectSharedBtn"),
-      reloadSharedBtn: document.getElementById("reloadSharedBtn"),
-      sharedStatusText: document.getElementById("sharedStatusText"),
       defaultProviderSelect: document.getElementById("defaultProviderSelect"),
       apiProviderEditor: document.getElementById("apiProviderEditor"),
       saveApiConfigBtn: document.getElementById("saveApiConfigBtn"),
@@ -406,9 +403,7 @@
       apiConfig: loadJson(STORAGE_KEYS.apiConfig, defaultApiConfig),
       maintenanceUnlocked: false,
       maintainerName: localStorage.getItem(STORAGE_KEYS.maintainer) || "",
-      sharedDirHandle: null,
-      sharedConnected: false,
-      sharedPathLabel: "未連線"
+      sharedDirHandle: null
     };
 
     function loadJson(key, fallback) {
@@ -494,10 +489,6 @@
         return { zh, en, category, ipc, note };
       }).filter((item) => item.zh && item.en);
     }
-    function updateSharedStatusText(message) {
-      el.sharedStatusText.textContent = message;
-      state.sharedPathLabel = message;
-    }
     function renderProviderSelectOptions() {
       const available = Object.entries(providerConfig).filter(([key]) => state.apiConfig.providers[key]?.enabled !== false);
       const nextProvider = available.some(([key]) => key === state.provider) ? state.provider : (state.apiConfig.defaultProvider || available[0]?.[0] || "deepseek");
@@ -510,10 +501,106 @@
       el.defaultProviderSelect.value = state.apiConfig.defaultProvider || "deepseek";
       el.apiProviderEditor.innerHTML = Object.entries(providerConfig).map(([key, provider]) => {
         const item = state.apiConfig.providers[key];
-        return `<div class="output-box" style="margin-bottom:14px;"><div class="field-grid"><div class="field"><label for="api-enabled-${key}">${provider.label} 啟用</label><select id="api-enabled-${key}"><option value="true"${item.enabled ? " selected" : ""}>啟用</option><option value="false"${!item.enabled ? " selected" : ""}>停用</option></select></div><div class="field"><label for="api-model-${key}">Model</label><input id="api-model-${key}" value="${(item.model || "").replace(/"/g, "&quot;")}"></div></div><div class="field"><label for="api-url-${key}">Base URL</label><input id="api-url-${key}" value="${(item.baseUrl || "").replace(/"/g, "&quot;")}"></div><div class="field"><label for="api-key-${key}">API Key</label><input id="api-key-${key}" type="password" value="${(item.apiKey || "").replace(/"/g, "&quot;")}"></div></div>`;
+        return `<div class="output-box" style="margin-bottom:14px;"><div class="field-grid"><div class="field"><label for="api-enabled-${key}">${provider.label} 啟用</label><select id="api-enabled-${key}"><option value="true"${item.enabled ? " selected" : ""}>啟用</option><option value="false"${!item.enabled ? " selected" : ""}>停用</option></select></div><div class="field"><label for="api-model-${key}">Model</label><input id="api-model-${key}" value="${(item.model || "").replace(/"/g, "&quot;")}"></div></div><div class="field"><label for="api-url-${key}">Base URL</label><input id="api-url-${key}" value="${(item.baseUrl || "").replace(/"/g, "&quot;")}"></div><div class="field"><label for="api-key-${key}">API Key</label><input id="api-key-${key}" type="password" value="${(item.apiKey || "").replace(/"/g, "&quot;")}"></div><div class="actions" style="margin-top:12px;"><button class="btn-soft" type="button" data-test-provider="${key}">測試 ${provider.label}</button></div><div id="api-test-result-${key}" class="notice hidden" style="margin-top:12px;"></div></div>`;
       }).join("");
       const meta = state.apiConfig.updatedAt ? `最後更新：${state.apiConfig.updatedAt}${state.apiConfig.updatedBy ? ` / ${state.apiConfig.updatedBy}` : ""}` : "尚未寫入共享 API 設定";
       setNotice(el.apiNotice, meta, state.apiConfig.updatedAt ? "good" : "warn");
+      el.apiProviderEditor.querySelectorAll("[data-test-provider]").forEach((button) => {
+        button.addEventListener("click", () => testApiConnection(button.dataset.testProvider));
+      });
+    }
+    function getApiFormConfig() {
+      return normalizeApiConfig({
+        defaultProvider: el.defaultProviderSelect.value,
+        providers: Object.fromEntries(Object.keys(providerConfig).map((key) => [key, {
+          enabled: document.getElementById(`api-enabled-${key}`).value === "true",
+          model: document.getElementById(`api-model-${key}`).value.trim(),
+          baseUrl: document.getElementById(`api-url-${key}`).value.trim(),
+          apiKey: document.getElementById(`api-key-${key}`).value.trim()
+        }])),
+        updatedAt: state.apiConfig.updatedAt,
+        updatedBy: state.apiConfig.updatedBy
+      });
+    }
+    function buildProviderRequestWithConfig(providerKey, config, systemPrompt, input, apiKey) {
+      const model = config.providers[providerKey].model;
+      const baseUrl = config.providers[providerKey].baseUrl;
+      if (providerKey === "deepseek") {
+        return {
+          url: baseUrl,
+          options: {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model,
+              temperature: 0,
+              response_format: { type: "json_object" },
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: input }
+              ]
+            })
+          }
+        };
+      }
+      if (providerKey === "openai") {
+        return {
+          url: baseUrl,
+          options: {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "api-key": apiKey },
+            body: JSON.stringify({
+              model,
+              temperature: 0,
+              instructions: systemPrompt,
+              input
+            })
+          }
+        };
+      }
+      const cleanedBaseUrl = baseUrl.replace(/:generateContent.*$/i, "").replace(/\/+$/g, "");
+      return {
+        url: `${cleanedBaseUrl}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        options: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            generationConfig: { temperature: 0, responseMimeType: "application/json" },
+            contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\nModel: ${model}\n\nUser input:\n${input}` }] }]
+          })
+        }
+      };
+    }
+    async function testApiConnection(providerKey) {
+      const config = getApiFormConfig();
+      const provider = providerConfig[providerKey];
+      const resultBox = document.getElementById(`api-test-result-${providerKey}`);
+      const apiKey = config.providers[providerKey]?.apiKey?.trim();
+      if (!apiKey) {
+        setNotice(resultBox, `測試失敗：${provider.label} 尚未填入 API Key。`, "bad");
+        return;
+      }
+      const prompt = "You are testing API connectivity. Return strict JSON only: {\"status\":\"ok\"}.";
+      const input = "Respond with JSON only.";
+      const request = buildProviderRequestWithConfig(providerKey, config, prompt, input, apiKey);
+      const testBtn = el.apiProviderEditor.querySelector(`[data-test-provider="${providerKey}"]`);
+      testBtn.disabled = true;
+      testBtn.textContent = "測試中...";
+      try {
+        const response = await fetch(request.url, request.options);
+        if (!response.ok) {
+          const detail = (await response.text()).slice(0, 400);
+          throw new Error(`HTTP ${response.status} ${detail}`);
+        }
+        const data = await response.json();
+        const preview = JSON.stringify(data).slice(0, 220);
+        setNotice(resultBox, `${provider.label} 連線成功。已收到有效回應。${preview ? ` 回應摘要：${preview}` : ""}`, "good");
+      } catch (error) {
+        setNotice(resultBox, `${provider.label} 連線失敗：${error.message}`, "bad");
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = `測試 ${provider.label}`;
+      }
     }
 
     function setNotice(target, message, kind) {
@@ -747,8 +834,6 @@
       saveJson(STORAGE_KEYS.glossary, state.glossary);
       saveJson(STORAGE_KEYS.version, state.versionLogs);
       saveJson(STORAGE_KEYS.apiConfig, state.apiConfig);
-      state.sharedConnected = true;
-      updateSharedStatusText(`已連線：${dirHandle.name}\\data`);
       renderProjectTable();
       renderGlossaryTable();
       renderVersionLogs();
@@ -776,12 +861,6 @@
       await loadSharedData(dirHandle);
       setNotice(el.mainNotice, "已載入共享資料夾主資料。", "good");
     }
-    function ensureSharedConnected() {
-      if (state.sharedDirHandle) return true;
-      setNotice(el.mainNotice, "請先按「連線共享資料夾」，再進行維護資料儲存。", "warn");
-      return false;
-    }
-
     async function callAi(input) {
       const apiKey = state.apiConfig.providers[state.provider]?.apiKey?.trim();
       if (!apiKey) throw new Error("未提供 API Key");
@@ -889,7 +968,6 @@
     function openVersionDialog() {
       openModal("新增進版紀錄", `<div class="field-grid"><div class="field"><label for="versionNo">版號</label><input id="versionNo" placeholder="v0.2.1-beta"></div><div class="field"><label for="versionDate">日期</label><input id="versionDate" placeholder="2026-03-10"></div></div><div class="field"><label for="versionChanges">變更內容</label><textarea id="versionChanges" placeholder="一行一項變更"></textarea></div><div class="actions"><button id="saveVersionBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
         document.getElementById("saveVersionBtn").addEventListener("click", async () => {
-          if (!ensureSharedConnected()) return;
           const version = document.getElementById("versionNo").value.trim();
           const date = document.getElementById("versionDate").value.trim();
           const changes = document.getElementById("versionChanges").value.split("\n").map((item) => item.trim()).filter(Boolean);
@@ -907,7 +985,6 @@
       const item = index === null ? { site:"IPT", customer:"", customerRole:"Tier1", oem:"", product:"", project:"" } : state.projectMemory[index];
       openModal(index === null ? "新增專案對照" : "修改專案對照", `<div class="field-grid"><div class="field"><label for="projectSite">Site</label><input id="projectSite" value="${item.site.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectCustomer">Customer</label><input id="projectCustomer" value="${item.customer.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="projectRole">Customer Role</label><input id="projectRole" value="${item.customerRole.replace(/"/g, "&quot;")}" placeholder="Tier1 / OEM"></div><div class="field"><label for="projectOem">OEM</label><input id="projectOem" value="${(item.oem || "").replace(/"/g, "&quot;")}" placeholder="Volvo / optional"></div></div><div class="field-grid"><div class="field"><label for="projectProduct">Product</label><input id="projectProduct" value="${item.product.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectName">Project</label><input id="projectName" value="${item.project.replace(/"/g, "&quot;")}"></div></div><div class="actions"><button id="saveProjectBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
         document.getElementById("saveProjectBtn").addEventListener("click", async () => {
-          if (!ensureSharedConnected()) return;
           const next = { site:document.getElementById("projectSite").value.trim(), customer:document.getElementById("projectCustomer").value.trim(), customerRole:document.getElementById("projectRole").value.trim(), oem:document.getElementById("projectOem").value.trim(), product:document.getElementById("projectProduct").value.trim(), project:document.getElementById("projectName").value.trim() };
           if (!next.site || !next.customer || !next.product || !next.project) return;
           if (index === null) state.projectMemory.push(next); else state.projectMemory[index] = next;
@@ -924,7 +1001,6 @@
       const item = index === null ? { zh:"", en:"", category:"", ipc:"", note:"" } : state.glossary[index];
       openModal(index === null ? "新增專有名詞" : "修改專有名詞", `<div class="field-grid"><div class="field"><label for="termZh">中文</label><input id="termZh" value="${item.zh.replace(/"/g, "&quot;")}"></div><div class="field"><label for="termEn">英文</label><input id="termEn" value="${item.en.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="termCategory">分類</label><input id="termCategory" value="${item.category.replace(/"/g, "&quot;")}" placeholder="Defect / Status / Soldering"></div><div class="field"><label for="termIpc">IPC-610 條目</label><input id="termIpc" value="${item.ipc.replace(/"/g, "&quot;")}" placeholder="例如 IPC-610 solder criteria"></div></div><div class="field"><label for="termNote">備註</label><input id="termNote" value="${item.note.replace(/"/g, "&quot;")}"></div><div class="actions"><button id="saveGlossaryBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
         document.getElementById("saveGlossaryBtn").addEventListener("click", async () => {
-          if (!ensureSharedConnected()) return;
           const next = { zh:document.getElementById("termZh").value.trim(), en:document.getElementById("termEn").value.trim(), category:document.getElementById("termCategory").value.trim(), ipc:document.getElementById("termIpc").value.trim(), note:document.getElementById("termNote").value.trim() };
           if (!next.zh || !next.en) return;
           if (index === null) state.glossary.push(next); else state.glossary[index] = next;
@@ -944,7 +1020,6 @@
       openModal(isProject ? "專案對照表 CSV" : "專有名詞 CSV", `<p class="section-desc">第一行欄位固定為 <span class="mono">${header}</span>。可直接貼上 CSV 覆蓋匯入，或複製下方內容匯出。</p><div class="field"><label for="csvData">CSV</label><textarea id="csvData" style="min-height:260px;">${header}\n${rows}</textarea></div><div class="actions"><button id="importCsvBtn" class="btn-accent" type="button">匯入覆蓋</button><button id="copyCsvBtn" class="btn-soft" type="button">複製 CSV</button></div>`, () => {
         document.getElementById("copyCsvBtn").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("csvData").value); });
         document.getElementById("importCsvBtn").addEventListener("click", async () => {
-          if (!ensureSharedConnected()) return;
           const lines = document.getElementById("csvData").value.split("\n").map((line) => line.trim()).filter(Boolean);
           if (lines.length < 2) return;
           const dataLines = lines.slice(1);
@@ -972,13 +1047,13 @@
     function renderProjectTable() {
       el.projectTableBody.innerHTML = state.projectMemory.map((item, index) => `<tr><td>${item.site}</td><td>${item.customer}</td><td>${item.customerRole || ""}</td><td>${item.oem || ""}</td><td>${item.product}</td><td>${item.project}</td><td><div class="actions"><button class="btn-soft" type="button" data-project-edit="${index}">修改</button><button class="btn-danger" type="button" data-project-del="${index}">刪除</button></div></td></tr>`).join("");
       el.projectTableBody.querySelectorAll("[data-project-edit]").forEach((button) => button.addEventListener("click", () => openProjectDialog(Number(button.dataset.projectEdit))));
-      el.projectTableBody.querySelectorAll("[data-project-del]").forEach((button) => button.addEventListener("click", async () => { if (!ensureSharedConnected()) return; state.projectMemory.splice(Number(button.dataset.projectDel), 1); saveJson(STORAGE_KEYS.project, state.projectMemory); await persistSharedFile("project"); renderProjectTable(); refreshCounts(); }));
+      el.projectTableBody.querySelectorAll("[data-project-del]").forEach((button) => button.addEventListener("click", async () => { state.projectMemory.splice(Number(button.dataset.projectDel), 1); saveJson(STORAGE_KEYS.project, state.projectMemory); await persistSharedFile("project"); renderProjectTable(); refreshCounts(); }));
     }
 
     function renderGlossaryTable() {
       el.glossaryTableBody.innerHTML = state.glossary.map((item, index) => `<tr><td>${item.zh}</td><td>${item.en}</td><td>${item.category || ""}</td><td>${item.ipc || ""}</td><td>${item.note || ""}</td><td><div class="actions"><button class="btn-soft" type="button" data-glossary-edit="${index}">修改</button><button class="btn-danger" type="button" data-glossary-del="${index}">刪除</button></div></td></tr>`).join("");
       el.glossaryTableBody.querySelectorAll("[data-glossary-edit]").forEach((button) => button.addEventListener("click", () => openGlossaryDialog(Number(button.dataset.glossaryEdit))));
-      el.glossaryTableBody.querySelectorAll("[data-glossary-del]").forEach((button) => button.addEventListener("click", async () => { if (!ensureSharedConnected()) return; state.glossary.splice(Number(button.dataset.glossaryDel), 1); saveJson(STORAGE_KEYS.glossary, state.glossary); await persistSharedFile("glossary"); renderGlossaryTable(); refreshCounts(); }));
+      el.glossaryTableBody.querySelectorAll("[data-glossary-del]").forEach((button) => button.addEventListener("click", async () => { state.glossary.splice(Number(button.dataset.glossaryDel), 1); saveJson(STORAGE_KEYS.glossary, state.glossary); await persistSharedFile("glossary"); renderGlossaryTable(); refreshCounts(); }));
     }
 
     function refreshCounts() {
@@ -1054,25 +1129,9 @@
       el.openProjectCsvBtn.addEventListener("click", () => openCsvDialog("project"));
       el.openGlossaryDialogBtn.addEventListener("click", () => openGlossaryDialog());
       el.openGlossaryCsvBtn.addEventListener("click", () => openCsvDialog("glossary"));
-      el.connectSharedBtn.addEventListener("click", async () => {
-        try { await connectSharedFolder(); }
-        catch (error) { setNotice(el.mainNotice, `共享資料夾連線失敗：${error.message}`, "bad"); }
-      });
-      el.reloadSharedBtn.addEventListener("click", async () => {
-        if (!state.sharedDirHandle) { setNotice(el.mainNotice, "尚未連線共享資料夾。", "warn"); return; }
-        try { await loadSharedData(state.sharedDirHandle); setNotice(el.mainNotice, "共享資料已重新載入。", "good"); }
-        catch (error) { setNotice(el.mainNotice, `重新載入失敗：${error.message}`, "bad"); }
-      });
       el.saveApiConfigBtn.addEventListener("click", async () => {
-        if (!ensureSharedConnected()) { setNotice(el.apiNotice, "請先連線共享資料夾，再儲存 API 設定。", "warn"); return; }
         const next = normalizeApiConfig({
-          defaultProvider: el.defaultProviderSelect.value,
-          providers: Object.fromEntries(Object.keys(providerConfig).map((key) => [key, {
-            enabled: document.getElementById(`api-enabled-${key}`).value === "true",
-            model: document.getElementById(`api-model-${key}`).value.trim(),
-            baseUrl: document.getElementById(`api-url-${key}`).value.trim(),
-            apiKey: document.getElementById(`api-key-${key}`).value.trim()
-          }])),
+          ...getApiFormConfig(),
           updatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
           updatedBy: state.maintainerName || "維護者"
         });
@@ -1097,7 +1156,6 @@
       renderProjectTable();
       renderGlossaryTable();
       renderApiConfigPage();
-      updateSharedStatusText("未連線");
       setTemplate(state.currentTemplateId, {}, {}, [], []);
       initEvents();
     }

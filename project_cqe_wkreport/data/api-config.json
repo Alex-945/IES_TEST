@@ -9,8 +9,8 @@
     },
     "openai": {
       "enabled": true,
-      "baseUrl": "https://api.openai.com/v1/chat/completions",
-      "model": "gpt-4o-mini",
+      "baseUrl": "https://aoai-aebu-aqad2-027.openai.azure.com/openai/responses?api-version=2025-04-01-preview",
+      "model": "gpt-5.2",
       "apiKey": ""
     },
     "gemini": {

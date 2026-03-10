@@ -1,0 +1,138 @@
+{
+  "spec_name": "provider-linkage-design",
+  "version": "1.0.0",
+  "purpose": "Define how backend maintenance settings control the frontend provider selection list and runtime request behavior.",
+  "design_goals": [
+    "Backend maintenance owns the provider configuration.",
+    "Frontend users only choose from enabled providers.",
+    "Runtime requests always use the backend-maintained provider config.",
+    "API keys are stored in provider config, not entered on the main page."
+  ],
+  "backend_maintenance_model": {
+    "config_root": "apiConfig",
+    "default_provider_field": "defaultProvider",
+    "providers_field": "providers",
+    "provider_fields": [
+      {
+        "name": "enabled",
+        "type": "boolean",
+        "required": true,
+        "purpose": "Controls whether the provider appears in frontend selection."
+      },
+      {
+        "name": "baseUrl",
+        "type": "string",
+        "required": true,
+        "purpose": "Provider endpoint used for runtime requests."
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "required": true,
+        "purpose": "Default model name sent in requests."
+      },
+      {
+        "name": "apiKey",
+        "type": "string",
+        "required": false,
+        "purpose": "Credential stored in maintenance config."
+      }
+    ],
+    "audit_fields": [
+      {
+        "name": "updatedAt",
+        "type": "string",
+        "format": "yyyy-MM-dd HH:mm:ss"
+      },
+      {
+        "name": "updatedBy",
+        "type": "string"
+      }
+    ]
+  },
+  "frontend_binding_rules": {
+    "source_of_truth": "apiConfig.providers",
+    "selection_list_rule": "Only providers with enabled=true are rendered in the frontend provider select.",
+    "selected_provider_rule": "If the current provider is disabled, fallback to defaultProvider. If defaultProvider is also invalid, fallback to the first enabled provider.",
+    "runtime_request_rule": "When a user runs AI generation, the request must use baseUrl, model, and apiKey from the currently selected provider config.",
+    "frontend_visibility_rule": "The main page does not expose API key editing. API settings are only editable in backend maintenance.",
+    "error_rule": "If apiKey is empty for the selected provider, frontend must block the request and show a clear maintenance-related error."
+  },
+  "ui_flow": {
+    "backend_maintenance": [
+      "Maintainer edits provider enabled flag, baseUrl, model, and apiKey.",
+      "Maintainer saves apiConfig.",
+      "Frontend selection list is rebuilt from enabled providers."
+    ],
+    "frontend_usage": [
+      "User opens tool main page.",
+      "User sees only enabled providers.",
+      "User selects one provider.",
+      "System sends request using that provider's backend-maintained config."
+    ]
+  },
+  "normalization_rules": [
+    "If a provider config is missing fields, merge it with defaults before rendering or sending requests.",
+    "Keep provider key names stable across tools, for example: deepseek, openai, gemini.",
+    "Display label can change per tool, but provider key should remain stable for reuse."
+  ],
+  "recommended_provider_keys": [
+    {
+      "key": "deepseek",
+      "display_label": "DeepSeek"
+    },
+    {
+      "key": "openai",
+      "display_label": "Azure OpenAI (gpt-5.2)"
+    },
+    {
+      "key": "gemini",
+      "display_label": "Gemini"
+    }
+  ],
+  "reference_runtime_functions": [
+    {
+      "name": "normalizeApiConfig",
+      "purpose": "Merge stored config with defaults."
+    },
+    {
+      "name": "renderProviderSelectOptions",
+      "purpose": "Render frontend selection list from enabled providers."
+    },
+    {
+      "name": "getApiFormConfig",
+      "purpose": "Read backend maintenance form values into a normalized config object."
+    },
+    {
+      "name": "buildProviderRequestWithConfig",
+      "purpose": "Build provider-specific request payload from the normalized config."
+    }
+  ],
+  "portable_example": {
+    "apiConfig": {
+      "defaultProvider": "openai",
+      "providers": {
+        "deepseek": {
+          "enabled": true,
+          "baseUrl": "https://api.deepseek.com/chat/completions",
+          "model": "deepseek-chat",
+          "apiKey": ""
+        },
+        "openai": {
+          "enabled": true,
+          "baseUrl": "https://aoai-aebu-aqad2-027.openai.azure.com/openai/responses?api-version=2025-04-01-preview",
+          "model": "gpt-5.2",
+          "apiKey": ""
+        },
+        "gemini": {
+          "enabled": false,
+          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash",
+          "model": "gemini-2.0-flash",
+          "apiKey": ""
+        }
+      },
+      "updatedAt": "",
+      "updatedBy": ""
+    }
+  }
+}
