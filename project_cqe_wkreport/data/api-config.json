@@ -1,0 +1,25 @@
+﻿{
+  "defaultProvider": "deepseek",
+  "providers": {
+    "deepseek": {
+      "enabled": true,
+      "baseUrl": "https://api.deepseek.com/chat/completions",
+      "model": "deepseek-chat",
+      "apiKey": ""
+    },
+    "openai": {
+      "enabled": true,
+      "baseUrl": "https://api.openai.com/v1/chat/completions",
+      "model": "gpt-4o-mini",
+      "apiKey": ""
+    },
+    "gemini": {
+      "enabled": true,
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash",
+      "model": "gemini-2.0-flash",
+      "apiKey": ""
+    }
+  },
+  "updatedAt": "",
+  "updatedBy": ""
+}

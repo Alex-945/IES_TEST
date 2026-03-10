@@ -1,0 +1,11 @@
+﻿zh,en,category,ipc,note
+分析中,Under FA,Status,,固定責任/狀態用語
+查無異常,NTF (No Trouble Found),Status,,不要自由翻譯
+刮痕,scratch,Defect,External condition,
+裂紋,crack,Defect,Physical damage,
+短路,short circuit,Failure,,
+開路,open circuit,Failure,,
+少錫,insufficient solder,Soldering,IPC-610 solder criteria,
+多錫,excess solder,Soldering,IPC-610 solder criteria,
+冷焊,cold solder,Soldering,IPC-610 solder criteria,
+錫珠,solder ball,Soldering,IPC-610 solder criteria,

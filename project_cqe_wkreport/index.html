@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CQE Weekly Summary Tool</title>
   <style>
-    :root { --bg:#09121f; --panel:#111d2d; --panel2:#0d1724; --line:#24344b; --text:#e9f0f9; --muted:#98a9c0; --accent:#ffb703; --accent2:#7bdff6; --ok:#72d69b; --warn:#ff9f43; --bad:#ff7b7b; }
+    :root { --bg:#f4f8fc; --panel:rgba(255,255,255,.92); --panel2:#ffffff; --line:#c9d8e8; --text:#122033; --muted:#5c7188; --accent:#f4b000; --accent2:#55b7d9; --ok:#3e9f67; --warn:#d78727; --bad:#d65a5a; }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:"Segoe UI","Microsoft JhengHei",sans-serif; color:var(--text); background:radial-gradient(circle at top left,rgba(255,183,3,.18),transparent 28%),linear-gradient(135deg,#08111b 0%,#102238 100%); min-height:100vh; }
+    body { margin:0; font-family:"Segoe UI","Microsoft JhengHei",sans-serif; color:var(--text); background:radial-gradient(circle at top left,rgba(244,176,0,.18),transparent 24%),radial-gradient(circle at top right,rgba(85,183,217,.14),transparent 22%),linear-gradient(180deg,#f8fbff 0%,#eef4fb 100%); min-height:100vh; }
     .shell { max-width:1480px; margin:0 auto; padding:24px; }
-    .hero,.panel,.modal { background:rgba(11,22,36,.94); border:1px solid var(--line); box-shadow:0 24px 80px rgba(0,0,0,.24); }
+    .hero,.panel,.modal { background:var(--panel); border:1px solid var(--line); box-shadow:0 18px 48px rgba(36,66,102,.10); backdrop-filter:blur(10px); }
     .hero { border-radius:24px; padding:24px; margin-bottom:18px; }
     .hero-head { display:flex; gap:16px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; }
-    .eyebrow { margin:0 0 6px; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.28em; }
+    .eyebrow { margin:0 0 6px; font-size:12px; color:#b67a00; text-transform:uppercase; letter-spacing:.28em; }
     h1 { margin:0; font-size:34px; line-height:1.15; }
     .sub { margin:10px 0 0; color:var(--muted); font-size:15px; line-height:1.8; max-width:920px; }
     .badges,.meta,.actions,.tab-row { display:flex; gap:10px; flex-wrap:wrap; }
-    .badge,.meta-item { border:1px solid var(--line); border-radius:999px; padding:8px 12px; font-size:12px; color:var(--muted); background:rgba(255,255,255,.03); }
-    .badge.primary { background:var(--accent); border-color:transparent; color:#06111b; font-weight:700; }
+    .badge,.meta-item { border:1px solid var(--line); border-radius:999px; padding:8px 12px; font-size:12px; color:var(--muted); background:rgba(255,255,255,.72); }
+    .badge.primary { background:var(--accent); border-color:transparent; color:#2a1b00; font-weight:700; }
     .tab-row { margin:18px 0 0; }
-    .tab { border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:14px; padding:11px 14px; cursor:pointer; font:inherit; font-weight:700; }
-    .tab.active { background:rgba(255,183,3,.12); color:var(--text); border-color:rgba(255,183,3,.4); }
+    .tab { border:1px solid var(--line); background:rgba(255,255,255,.66); color:var(--muted); border-radius:14px; padding:11px 14px; cursor:pointer; font:inherit; font-weight:700; }
+    .tab.active { background:rgba(244,176,0,.16); color:var(--text); border-color:rgba(244,176,0,.45); }
     .panel { border-radius:22px; padding:20px; }
     .page { display:none; }
     .page.active { display:block; }
@@ -29,27 +29,29 @@
     .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
     .section-title { margin:0 0 8px; font-size:20px; }
     .section-desc { margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.7; }
-    label { display:block; margin-bottom:7px; font-size:13px; font-weight:600; color:#dce7f6; }
+    label { display:block; margin-bottom:7px; font-size:13px; font-weight:600; color:#1d3552; }
     input,textarea,select { width:100%; border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--panel2); color:var(--text); outline:none; font:inherit; }
     textarea { min-height:120px; resize:vertical; }
-    input:focus,textarea:focus,select:focus { border-color:rgba(255,183,3,.5); box-shadow:0 0 0 3px rgba(255,183,3,.14); }
+    input:focus,textarea:focus,select:focus { border-color:rgba(244,176,0,.56); box-shadow:0 0 0 3px rgba(244,176,0,.16); }
+    .input-risk { border-color:rgba(215,135,39,.7) !important; box-shadow:0 0 0 3px rgba(215,135,39,.14); background:#fffaf0; }
+    .input-missing { border-color:rgba(214,90,90,.72) !important; box-shadow:0 0 0 3px rgba(214,90,90,.14); background:#fff5f5; }
     button { border:0; border-radius:14px; padding:11px 15px; font:inherit; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.6; cursor:not-allowed; }
-    .btn-accent { background:var(--accent); color:#06111b; }
-    .btn-soft { background:rgba(255,255,255,.04); color:var(--text); border:1px solid var(--line); }
-    .btn-sky { background:var(--accent2); color:#06111b; }
-    .btn-danger { background:rgba(255,123,123,.15); color:#ffd4d4; border:1px solid rgba(255,123,123,.35); }
-    .notice { border:1px solid var(--line); border-radius:16px; padding:13px 14px; font-size:14px; line-height:1.7; color:var(--muted); background:rgba(255,255,255,.03); }
-    .notice.good { border-color:rgba(114,214,155,.35); background:rgba(114,214,155,.08); color:#d7ffe6; }
-    .notice.warn { border-color:rgba(255,159,67,.35); background:rgba(255,159,67,.08); color:#ffe3bf; }
-    .notice.bad { border-color:rgba(255,123,123,.35); background:rgba(255,123,123,.08); color:#ffd6d6; }
-    .output-box,.info-box,.table-wrap,.log-item { border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.03); }
+    .btn-accent { background:var(--accent); color:#2a1b00; }
+    .btn-soft { background:rgba(255,255,255,.78); color:var(--text); border:1px solid var(--line); }
+    .btn-sky { background:var(--accent2); color:#08212b; }
+    .btn-danger { background:#fff1f1; color:#a83a3a; border:1px solid rgba(214,90,90,.28); }
+    .notice { border:1px solid var(--line); border-radius:16px; padding:13px 14px; font-size:14px; line-height:1.7; color:var(--muted); background:rgba(255,255,255,.72); }
+    .notice.good { border-color:rgba(62,159,103,.28); background:rgba(62,159,103,.08); color:#1d6f45; }
+    .notice.warn { border-color:rgba(215,135,39,.28); background:rgba(215,135,39,.08); color:#8b5a16; }
+    .notice.bad { border-color:rgba(214,90,90,.28); background:rgba(214,90,90,.08); color:#9b3434; }
+    .output-box,.info-box,.table-wrap,.log-item { border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.78); }
     .output-box { padding:16px; min-height:160px; line-height:1.85; white-space:pre-wrap; }
     .info-box { padding:14px; color:var(--muted); font-size:13px; line-height:1.7; }
     .table-wrap { overflow:auto; max-height:480px; }
     table { width:100%; border-collapse:collapse; }
     th,td { border-bottom:1px solid var(--line); padding:10px 12px; text-align:left; font-size:13px; vertical-align:top; }
-    th { position:sticky; top:0; background:#162436; color:#dce7f6; z-index:1; }
+    th { position:sticky; top:0; background:#eef4fb; color:#1d3552; z-index:1; }
     .small { font-size:12px; color:var(--muted); }
     .mono { font-family:Consolas,"Courier New",monospace; }
     .hidden { display:none !important; }
@@ -74,17 +76,17 @@
           <h1>AI 驅動的固定句型總結工具</h1>
           <div class="badges" style="margin-top:12px;">
             <div class="badge primary">測試版</div>
-            <div class="badge">Version: v0.2.0-beta</div>
+            <div class="badge">Version: v0.3.0-beta</div>
             <div class="badge">Status: 未放行</div>
           </div>
-          <p class="sub">這是純 HTML 版本，不需要 Node。主流程是工程師貼入原始資訊，AI 自動選模板與拆欄位；若 AI 無法使用，也能手動維護模板、專案對照表與專有名詞對應。</p>
+          <p class="sub">這是純 HTML 版本，不需要 Node。主流程是工程師貼入原始資訊，AI 先協助完成初稿，再由工程師快速審查、修正與補缺；若 AI 無法使用，也能手動維護模板、專案對照表與專有名詞對應。</p>
         </div>
       </div>
       <div class="tab-row">
         <button class="tab active" data-page="generator">Summary Tool</button>
-        <button class="tab" data-page="version">版本進版</button>
-        <button class="tab" data-page="project">專案對照表</button>
-        <button class="tab" data-page="glossary">專有名詞對應</button>
+        <button class="tab" data-page="version" data-protected="true">版本進版</button>
+        <button class="tab" data-page="project" data-protected="true">專案對照表</button>
+        <button class="tab" data-page="glossary" data-protected="true">專有名詞對應</button>
       </div>
     </section>
 
@@ -92,20 +94,14 @@
       <div class="grid">
         <div class="panel">
           <h2 class="section-title">輸入區</h2>
-          <p class="section-desc">先貼原始描述，再讓 AI 選模板。如果 AI 失敗，可切換手動模式直接修欄位。</p>
-          <div class="field-grid">
-            <div class="field">
-              <label for="providerSelect">AI 模型供應商</label>
-              <select id="providerSelect">
-                <option value="deepseek">DeepSeek</option>
-                <option value="openai">GPT / OpenAI</option>
-                <option value="gemini">Gemini</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="apiKey">API Key</label>
-              <input id="apiKey" type="password" placeholder="請輸入 API Key">
-            </div>
+          <p class="section-desc">先貼原始描述，再讓 AI 幫前線工程師完成初稿。如果 AI 失敗，可切換手動模式直接修欄位。</p>
+          <div class="field">
+            <label for="providerSelect">AI 模型供應商</label>
+            <select id="providerSelect">
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">GPT / OpenAI</option>
+              <option value="gemini">Gemini</option>
+            </select>
           </div>
           <div class="block">
             <label for="rawInput">AI 快速輸入</label>
@@ -126,12 +122,16 @@
             <div class="info-box">Project Memory：<span id="memoryCount"></span></div>
             <div class="info-box">Controlled Glossary：<span id="glossaryCount"></span></div>
           </div>
+          <div class="field-grid" style="margin-top:14px;">
+            <div class="info-box">共享資料夾：<span id="sharedStatusText">未連線</span></div>
+            <div class="actions"><button id="connectSharedBtn" class="btn-soft" type="button">連線共享資料夾</button><button id="reloadSharedBtn" class="btn-soft" type="button">重新載入共享資料</button></div>
+          </div>
           <div id="fieldGrid" style="margin-top:16px;"></div>
         </div>
 
         <div class="panel">
           <h2 class="section-title">輸出區</h2>
-          <p class="section-desc">中文輸出固定使用中文句型。即使原始輸入是英文，也要盡量轉成中文敘述；專有名詞與難翻譯術語可保留英文。</p>
+          <p class="section-desc">中文輸出固定使用中文句型。即使原始輸入是英文，也要盡量轉成中文敘述；專有名詞與難翻譯術語可保留英文。AI 的角色是先完成初稿，再提醒工程師哪些地方需要確認。</p>
           <div class="meta" id="statusMeta"></div>
           <div id="missingNotice" class="notice warn hidden" style="margin-top:12px;"></div>
           <div class="block" style="margin-top:18px;">
@@ -153,24 +153,37 @@
 
     <section id="page-version" class="page">
       <div class="panel">
-        <h2 class="section-title">版本進版</h2>
-        <p class="section-desc">記錄版號、時間與變更內容。這一頁維持人可讀、工程師可追的格式。</p>
+        <h2 class="section-title">版本進版 / API 維護</h2>
+        <p class="section-desc">這一頁由維護者管理版號、時間、變更內容與共享 API 設定。</p>
         <div class="actions" style="margin-bottom:14px;"><button id="openVersionDialogBtn" class="btn-accent" type="button">新增進版紀錄</button></div>
         <div id="versionLogList" class="log-list"></div>
+        <div class="output-box" style="margin-top:18px;">
+          <h3 style="margin:0 0 10px;">API 維護</h3>
+          <p class="section-desc" style="margin-bottom:14px;">API Key、Base URL、Model 會寫入共享資料夾；一般使用者只使用，不需自行調整。</p>
+          <div id="apiNotice" class="notice hidden" style="margin-bottom:14px;"></div>
+          <div class="field">
+            <label for="defaultProviderSelect">預設供應商</label>
+            <select id="defaultProviderSelect"></select>
+          </div>
+          <div id="apiProviderEditor"></div>
+          <div class="actions" style="margin-top:14px;">
+            <button id="saveApiConfigBtn" class="btn-accent" type="button">儲存 API 設定</button>
+          </div>
+        </div>
       </div>
     </section>
 
     <section id="page-project" class="page">
       <div class="panel">
         <h2 class="section-title">專案對照表</h2>
-        <p class="section-desc">建議維護方式：平常用表格直接編修，大量更新時用 CSV 匯入。CSV 欄位順序固定為 <span class="mono">site,customer,customerRole,affectedCustomer,product,project</span>。</p>
+        <p class="section-desc">建議維護方式：平常用表格直接編修，大量更新時用 CSV 匯入。CSV 欄位順序固定為 <span class="mono">site,customer,customerRole,oem,product,project</span>。</p>
         <div class="actions" style="margin-bottom:14px;">
           <button id="openProjectDialogBtn" class="btn-accent" type="button">新增資料</button>
           <button id="openProjectCsvBtn" class="btn-soft" type="button">CSV 匯入 / 匯出</button>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Site</th><th>Customer</th><th>Role</th><th>Affected Customer</th><th>Product</th><th>Project</th><th>操作</th></tr></thead>
+            <thead><tr><th>Site</th><th>Customer</th><th>Role</th><th>OEM</th><th>Product</th><th>Project</th><th>操作</th></tr></thead>
             <tbody id="projectTableBody"></tbody>
           </table>
         </div>
@@ -206,21 +219,23 @@
   </div>
 
   <script>
-    const STORAGE_KEYS = { provider:"cqe_provider", project:"cqe_project_memory", glossary:"cqe_glossary", version:"cqe_version_log", keyDeepSeek:"cqe_key_deepseek", keyOpenAI:"cqe_key_openai", keyGemini:"cqe_key_gemini" };
-    const defaultVersionLogs = [{ version:"v0.2.0-beta", date:"2026-03-09", changes:["改成多頁籤工具：Summary Tool / 版本進版 / 專案對照表 / 專有名詞對應","加入多模型切換：DeepSeek / GPT(OpenAI) / Gemini","API key 改為依供應商分開暫存","加入缺欄位彈窗，允許工程師補齊或填 TBD / NA","加入專案對照表與術語表的 Dialog 編修與 CSV 匯入 / 匯出"] }];
+    const STORAGE_KEYS = { provider:"cqe_provider", project:"cqe_project_memory", glossary:"cqe_glossary", version:"cqe_version_log", apiConfig:"cqe_api_config", maintainer:"cqe_maintainer_name" };
+    const MAINTAINER_PASSWORD = "CQE";
+    const SHARED_FILES = { project:"project-memory.csv", glossary:"glossary.csv", version:"version-log.json", api:"api-config.json" };
+    const defaultVersionLogs = [{ version:"v0.3.0-beta", date:"2026-03-10", changes:["新增半共用模式：主畫面開放使用，維護頁上密碼鎖","加入共享資料夾連線與重新載入入口","專案對照表、專有名詞、進版與 API 設定改為共享檔可同步","新增 API 維護頁，集中管理 provider / base URL / model / API Key","保留個人輸入與輸出不寫回共享資料"] },{ version:"v0.2.0-beta", date:"2026-03-09", changes:["改成多頁籤工具：Summary Tool / 版本進版 / 專案對照表 / 專有名詞對應","加入多模型切換：DeepSeek / GPT(OpenAI) / Gemini","API key 改為依供應商分開暫存","加入缺欄位彈窗，允許工程師補齊或填 TBD / NA","加入專案對照表與術語表的 Dialog 編修與 CSV 匯入 / 匯出"] }];
     const defaultProjectMemory = [
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,WHITE", project:"Jiading" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"NIO", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,BLACK (NIO FOB)", project:"Jiading" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"NIO", product:"FOB 汽車鑰匙(黑)", project:"Jiading" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"NIO", product:"BTM 藍牙模組 (NIO BTM)", project:"Jiading" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"BYD", product:"BTM 藍牙模組 (BYD UWB)", project:"Pudong" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"JMC", product:"CCU (Center control unit)", project:"Changning" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"JMC", product:"ZCU (Zone Control Unit)", project:"SongJiang" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"Volvo", product:"電動窗控制開關 (CMA5/CMA6)", project:"Hat-trick" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"GWM", product:"門模塊控制器 DCU", project:"Tianchi" },
-      { site:"IPT", customer:"Kostal", customerRole:"Tier1", affectedCustomer:"Mazda", product:"車載充電機 OBC", project:"Qingpu" },
-      { site:"IPT", customer:"Forvia", customerRole:"Tier1", affectedCustomer:"", product:"Car Audio (Shoko Main board)", project:"Shoko" },
-      { site:"IPT", customer:"HCMF", customerRole:"Tier1", affectedCustomer:"", product:"CEER DCU", project:"Jiangshan" }
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,WHITE", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"NIO", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,BLACK (NIO FOB)", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"NIO", product:"FOB 汽車鑰匙(黑)", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"NIO", product:"BTM 藍牙模組 (NIO BTM)", project:"Jiading" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"BYD", product:"BTM 藍牙模組 (BYD UWB)", project:"Pudong" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"JMC", product:"CCU (Center control unit)", project:"Changning" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"JMC", product:"ZCU (Zone Control Unit)", project:"SongJiang" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"Volvo", product:"電動窗控制開關 (CMA5/CMA6)", project:"Hat-trick" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"GWM", product:"門模塊控制器 DCU", project:"Tianchi" },
+      { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"Mazda", product:"車載充電機 OBC", project:"Qingpu" },
+      { site:"IPT", customer:"Forvia", customerRole:"Tier1", oem:"", product:"Car Audio (Shoko Main board)", project:"Shoko" },
+      { site:"IPT", customer:"HCMF", customerRole:"Tier1", oem:"", product:"CEER DCU", project:"Jiangshan" }
     ];
     const defaultSiteMaster = [
       { code:"IPT", aliases:["上海", "上海工廠", "Inventec Shanghai", "英業達上海"] },
@@ -236,6 +251,16 @@
       { code:"FR", meaning:"OEM 售後 / 4S 店發現", hints:["field", "4S", "aftermarket", "售後"] }
     ];
     const defaultGlossary = [{ zh:"分析中", en:"Under FA", category:"Status", ipc:"", note:"固定責任/狀態用語" },{ zh:"查無異常", en:"NTF (No Trouble Found)", category:"Status", ipc:"", note:"不要自由翻譯" },{ zh:"刮痕", en:"scratch", category:"Defect", ipc:"External condition", note:"" },{ zh:"裂紋", en:"crack", category:"Defect", ipc:"Physical damage", note:"" },{ zh:"短路", en:"short circuit", category:"Failure", ipc:"", note:"" },{ zh:"開路", en:"open circuit", category:"Failure", ipc:"", note:"" },{ zh:"少錫", en:"insufficient solder", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" },{ zh:"多錫", en:"excess solder", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" },{ zh:"冷焊", en:"cold solder", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" },{ zh:"錫珠", en:"solder ball", category:"Soldering", ipc:"IPC-610 solder criteria", note:"" }];
+    const defaultApiConfig = {
+      defaultProvider: "deepseek",
+      providers: {
+        deepseek: { enabled:true, baseUrl:"https://api.deepseek.com/chat/completions", model:"deepseek-chat", apiKey:"" },
+        openai: { enabled:true, baseUrl:"https://api.openai.com/v1/chat/completions", model:"gpt-4o-mini", apiKey:"" },
+        gemini: { enabled:true, baseUrl:"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", model:"gemini-2.0-flash", apiKey:"" }
+      },
+      updatedAt: "",
+      updatedBy: ""
+    };
     const templates = [
       { id:"audit-plan", category:"Audit/Certification", type:"Plan", label:"Audit / Certification Plan", description:"Use for planned audits or certifications.", sourceTemplate:"[Site]: will conduct <Audit> on <Date>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"audit", label:"Audit", placeholder:"VDA 6.3 audit", required:true },{ key:"date", label:"Date", placeholder:"2026/03/20", required:true }], buildZh:(v)=>`[${v.site}]：預計於 ${v.date} 進行 ${v.audit}。`, buildEn:(v)=>`[${v.site}]: will conduct ${v.audit} on ${v.date}.` },
       { id:"audit-result", category:"Audit/Certification", type:"Result", label:"Audit / Certification Result", description:"Use for completed audits and outcomes.", sourceTemplate:"[Site]: <Audit> was conducted on <Date>, <Result>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"audit", label:"Audit", placeholder:"VDA 6.3 audit", required:true },{ key:"date", label:"Date", placeholder:"2026/03/20", required:true },{ key:"result", label:"Result", placeholder:"no major findings", required:true }], buildZh:(v)=>`[${v.site}]：已於 ${v.date} 完成 ${v.audit}，${v.result}。`, buildEn:(v)=>`[${v.site}]: ${v.audit} was conducted on ${v.date}, ${v.result}.` },
@@ -243,7 +268,7 @@
       { id:"customer-visit-result", category:"Customer Visit/VOC", type:"Result", label:"Customer Visit / VOC Result", description:"Use for completed visits and VOC summaries.", sourceTemplate:"[Site]: <Customer[/OEM]> visited <Site> on <DateRange> for <Purpose>, <Outcome>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer / OEM", placeholder:"KOSTAL", required:true },{ key:"dateRange", label:"Date / Date Range", placeholder:"3/10", required:true },{ key:"purpose", label:"Purpose", placeholder:"confirm complaints and audit preparation status", required:true },{ key:"outcome", label:"Outcome", placeholder:"TBD / NA if unknown", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 於 ${v.dateRange} 拜訪 ${v.site}，目的為 ${v.purpose}；結果：${v.outcome}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} visited ${v.site} on ${v.dateRange} for ${v.purpose}, ${v.outcome}.` },
       { id:"customer-request-plan", category:"Customer Request", type:"Plan", label:"Customer Request Plan", description:"Use for incoming customer requests with next action planning.", sourceTemplate:"[Site]: <Customer> <UrgentVerb> <Site> to <Action> <Tier1/OEM> <Product> <Task> on <Date>; CQE <Role>, plan to <NextStep> on <NextDate>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer", placeholder:"KOSTAL", required:true },{ key:"urgentVerb", label:"Urgent Verb", placeholder:"requested urgently", required:true },{ key:"action", label:"Action", placeholder:"support", required:true },{ key:"tier", label:"Tier1 / OEM", placeholder:"VOLVO", required:true },{ key:"product", label:"Product", placeholder:"window switch", required:true },{ key:"task", label:"Task", placeholder:"onsite sorting", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"role", label:"CQE Role", placeholder:"coordinated factory response", required:true },{ key:"nextStep", label:"Next Step", placeholder:"send 8D plan", required:true },{ key:"nextDate", label:"Next Date", placeholder:"3/11", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 已${v.urgentVerb}${v.site}，要求${v.action}${v.tier} ${v.product} 之 ${v.task}，時間為 ${v.date}；CQE ${v.role}，下一步預計於 ${v.nextDate} ${v.nextStep}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} ${v.urgentVerb} ${v.site} to ${v.action} ${v.tier} ${v.product} ${v.task} on ${v.date}; CQE ${v.role}, plan to ${v.nextStep} on ${v.nextDate}.` },
       { id:"customer-request-result", category:"Customer Request", type:"Result", label:"Customer Request Result", description:"Use for completed actions after customer requests.", sourceTemplate:"[Site]: <Customer> <UrgentVerb(past)> <Site> to <Action> <Tier1/OEM> <Product> <Task> on <Date>; CQE <Action>, <CompletionStatus>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer", placeholder:"KOSTAL", required:true },{ key:"urgentVerbPast", label:"Urgent Verb (Past)", placeholder:"urgently requested", required:true },{ key:"action", label:"Action", placeholder:"support", required:true },{ key:"tier", label:"Tier1 / OEM", placeholder:"VOLVO", required:true },{ key:"product", label:"Product", placeholder:"window switch", required:true },{ key:"task", label:"Task", placeholder:"onsite sorting", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"cqeAction", label:"CQE Action", placeholder:"deployed sorting support", required:true },{ key:"completionStatus", label:"Completion Status", placeholder:"sorting completed and feedback sent", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} 已於 ${v.date}${v.urgentVerbPast}${v.site}，要求${v.action}${v.tier} ${v.product} 之 ${v.task}；CQE 已${v.cqeAction}，${v.completionStatus}。`, buildEn:(v)=>`[${v.site}]: ${v.customer} ${v.urgentVerbPast} ${v.site} to ${v.action} ${v.tier} ${v.product} ${v.task} on ${v.date}; CQE ${v.cqeAction}, ${v.completionStatus}.` },
-      { id:"complaints", category:"Complaints", type:"IQC/VLRR/0KM/FR", label:"Complaints", description:"Use for customer complaints and defect summaries.", sourceTemplate:"[Site] [Category]: <Customer> reported (<Project>) <Product> <Defect> *<Qty> pcs in <Location> on <Date>; <Follow-up actions>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"complaintCategory", label:"Category", placeholder:"VLRR", required:true },{ key:"customer", label:"Direct Customer", placeholder:"KOSTAL", required:true },{ key:"affectedCustomer", label:"Affected Customer / OEM", placeholder:"Volvo / optional", required:false },{ key:"project", label:"Project", placeholder:"Hat-trick", required:true },{ key:"product", label:"Product", placeholder:"電動窗控制開關 (CMA5/CMA6)", required:true },{ key:"defect", label:"Defect", placeholder:"pad 上有異物(錫膏)", required:true },{ key:"qty", label:"Qty", placeholder:"1", required:true },{ key:"location", label:"Finding Location", placeholder:"customer line / IQC / 0KM / FR", required:true },{ key:"date", label:"Date", placeholder:"3/9", required:true },{ key:"followUp", label:"Follow-up Actions", placeholder:"MPE 分析中", required:true }], buildZh:(v)=>`[${v.site}] [${v.complaintCategory}]：${v.customer} 反映${v.affectedCustomer ? `（下游客戶 ${v.affectedCustomer}）` : ""} (${v.project}) ${v.product} 於 ${v.location} 在 ${v.date} 發生 ${v.defect}，數量 *${v.qty} pcs；${v.followUp}。`, buildEn:(v)=>`[${v.site}] [${v.complaintCategory}]: ${v.customer} reported${v.affectedCustomer ? ` for downstream customer ${v.affectedCustomer}` : ""} (${v.project}) ${v.product} ${v.defect} *${v.qty} pcs in ${v.location} on ${v.date}; ${v.followUp}.` },
+      { id:"complaints", category:"Complaints", type:"IQC/VLRR/0KM/FR", label:"Complaints", description:"Use for customer complaints and defect summaries.", sourceTemplate:"[Site] [Category]: <Customer> reported (<Project>) <Product> <Defect> *<Qty> pcs in <Location> on <Date>; <Follow-up actions>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"complaintCategory", label:"Category", placeholder:"VLRR", required:true },{ key:"customer", label:"Direct Customer", placeholder:"KOSTAL", required:true },{ key:"oem", label:"OEM", placeholder:"Volvo / optional", required:false },{ key:"project", label:"Project", placeholder:"Hat-trick", required:true },{ key:"product", label:"Product", placeholder:"電動窗控制開關 (CMA5/CMA6)", required:true },{ key:"defect", label:"Defect", placeholder:"pad 上有異物(錫膏)", required:true },{ key:"qty", label:"Qty", placeholder:"1", required:true },{ key:"location", label:"Finding Location", placeholder:"customer line / IQC / 0KM / FR", required:true },{ key:"date", label:"Date", placeholder:"3/9", required:true },{ key:"followUp", label:"Follow-up Actions", placeholder:"MPE 分析中", required:true }], buildZh:(v)=>`[${v.site}] [${v.complaintCategory}]：${v.customer} 反映${v.oem ? `（OEM ${v.oem}）` : ""} (${v.project}) ${v.product} 於 ${v.location} 在 ${v.date} 發生 ${v.defect}，數量 *${v.qty} pcs；${v.followUp}。`, buildEn:(v)=>`[${v.site}] [${v.complaintCategory}]: ${v.customer} reported${v.oem ? ` for OEM ${v.oem}` : ""} (${v.project}) ${v.product} ${v.defect} *${v.qty} pcs in ${v.location} on ${v.date}; ${v.followUp}.` },
       { id:"improvement-closure", category:"Improvement/Closure", type:"NA", label:"Improvement / Closure", description:"Use for major improvement milestones or closure notes.", sourceTemplate:"[Site]: <Task> -- <Date> <Status>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"task", label:"Task", placeholder:"line audit finding closure", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"status", label:"Status", placeholder:"completed", required:true }], buildZh:(v)=>`[${v.site}]：${v.task}，於 ${v.date} ${v.status}。`, buildEn:(v)=>`[${v.site}]: ${v.task} -- ${v.date} ${v.status}.` },
       { id:"ongoing-activity", category:"Ongoing Activity", type:"NA", label:"Ongoing Activity", description:"Use for ongoing project or improvement activities.", sourceTemplate:"[Site]: <Project>: <Action> from <StartDate> - <Status>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"project", label:"Project", placeholder:"Customer VOC reduction", required:true },{ key:"action", label:"Action", placeholder:"weekly defect review launched", required:true },{ key:"startDate", label:"Start Date", placeholder:"3/1", required:true },{ key:"status", label:"Status", placeholder:"in progress", required:true }], buildZh:(v)=>`[${v.site}]：${v.project}：自 ${v.startDate} 起執行 ${v.action}，目前 ${v.status}。`, buildEn:(v)=>`[${v.site}]: ${v.project}: ${v.action} from ${v.startDate} - ${v.status}.` },
       { id:"new-project-kickoff", category:"New Project Kick-off", type:"NA", label:"New Project Kick-off", description:"Use for new project start records.", sourceTemplate:"[Site]: <Customer>/<Product> (<ProjectName>) kicked off on <Date>; <Status>.", fields:[{ key:"site", label:"Site", placeholder:"IPT", required:true },{ key:"customer", label:"Customer", placeholder:"KOSTAL", required:true },{ key:"product", label:"Product", placeholder:"window switch", required:true },{ key:"projectName", label:"Project Name", placeholder:"Jiading", required:true },{ key:"date", label:"Date", placeholder:"3/10", required:true },{ key:"status", label:"Status", placeholder:"customer requirement review completed", required:true }], buildZh:(v)=>`[${v.site}]：${v.customer} / ${v.product} (${v.projectName}) 已於 ${v.date} 啟動；${v.status}。`, buildEn:(v)=>`[${v.site}]: ${v.customer}/${v.product} (${v.projectName}) kicked off on ${v.date}; ${v.status}.` },
@@ -253,16 +278,15 @@
     const providerConfig = {
       deepseek: {
         label: "DeepSeek",
-        keyStorage: STORAGE_KEYS.keyDeepSeek,
         placeholder: "請輸入 DeepSeek API Key",
         buildRequest(systemPrompt, input, apiKey) {
           return {
-            url: "https://api.deepseek.com/chat/completions",
+            url: state.apiConfig.providers.deepseek.baseUrl || defaultApiConfig.providers.deepseek.baseUrl,
             options: {
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
               body: JSON.stringify({
-                model: "deepseek-chat",
+                model: state.apiConfig.providers.deepseek.model || defaultApiConfig.providers.deepseek.model,
                 temperature: 0.1,
                 response_format: { type: "json_object" },
                 messages: [
@@ -277,16 +301,15 @@
       },
       openai: {
         label: "GPT / OpenAI",
-        keyStorage: STORAGE_KEYS.keyOpenAI,
         placeholder: "請輸入 OpenAI API Key",
         buildRequest(systemPrompt, input, apiKey) {
           return {
-            url: "https://api.openai.com/v1/chat/completions",
+            url: state.apiConfig.providers.openai.baseUrl || defaultApiConfig.providers.openai.baseUrl,
             options: {
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
               body: JSON.stringify({
-                model: "gpt-4o-mini",
+                model: state.apiConfig.providers.openai.model || defaultApiConfig.providers.openai.model,
                 temperature: 0.1,
                 response_format: { type: "json_object" },
                 messages: [
@@ -301,17 +324,19 @@
       },
       gemini: {
         label: "Gemini",
-        keyStorage: STORAGE_KEYS.keyGemini,
         placeholder: "請輸入 Gemini API Key",
         buildRequest(systemPrompt, input, apiKey) {
+          const baseUrl = state.apiConfig.providers.gemini.baseUrl || defaultApiConfig.providers.gemini.baseUrl;
+          const model = state.apiConfig.providers.gemini.model || defaultApiConfig.providers.gemini.model;
+          const cleanedBaseUrl = baseUrl.replace(/:generateContent.*$/i, "").replace(/\/+$/g, "");
           return {
-            url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+            url: `${cleanedBaseUrl}:generateContent?key=${encodeURIComponent(apiKey)}`,
             options: {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
-                contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\nUser input:\n${input}` }] }]
+                contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\nModel: ${model}\n\nUser input:\n${input}` }] }]
               })
             }
           };
@@ -329,7 +354,6 @@
         glossary: document.getElementById("page-glossary")
       },
       providerSelect: document.getElementById("providerSelect"),
-      apiKey: document.getElementById("apiKey"),
       rawInput: document.getElementById("rawInput"),
       runAiBtn: document.getElementById("runAiBtn"),
       manualBtn: document.getElementById("manualBtn"),
@@ -355,6 +379,13 @@
       openProjectCsvBtn: document.getElementById("openProjectCsvBtn"),
       openGlossaryDialogBtn: document.getElementById("openGlossaryDialogBtn"),
       openGlossaryCsvBtn: document.getElementById("openGlossaryCsvBtn"),
+      connectSharedBtn: document.getElementById("connectSharedBtn"),
+      reloadSharedBtn: document.getElementById("reloadSharedBtn"),
+      sharedStatusText: document.getElementById("sharedStatusText"),
+      defaultProviderSelect: document.getElementById("defaultProviderSelect"),
+      apiProviderEditor: document.getElementById("apiProviderEditor"),
+      saveApiConfigBtn: document.getElementById("saveApiConfigBtn"),
+      apiNotice: document.getElementById("apiNotice"),
       modalBackdrop: document.getElementById("modalBackdrop"),
       modalTitle: document.getElementById("modalTitle"),
       modalBody: document.getElementById("modalBody"),
@@ -367,9 +398,17 @@
       fieldValues: {},
       zhHints: {},
       aiConfidence: null,
+      highRiskFields: [],
+      reviewerQuestions: [],
       projectMemory: loadJson(STORAGE_KEYS.project, defaultProjectMemory),
       glossary: loadJson(STORAGE_KEYS.glossary, defaultGlossary),
-      versionLogs: loadJson(STORAGE_KEYS.version, defaultVersionLogs)
+      versionLogs: loadJson(STORAGE_KEYS.version, defaultVersionLogs),
+      apiConfig: loadJson(STORAGE_KEYS.apiConfig, defaultApiConfig),
+      maintenanceUnlocked: false,
+      maintainerName: localStorage.getItem(STORAGE_KEYS.maintainer) || "",
+      sharedDirHandle: null,
+      sharedConnected: false,
+      sharedPathLabel: "未連線"
     };
 
     function loadJson(key, fallback) {
@@ -385,6 +424,97 @@
     function getTemplateById(id) { return templates.find((item) => item.id === id) || templates[0]; }
     function defaultValues(templateId) { return Object.fromEntries(getTemplateById(templateId).fields.map((field) => [field.key, ""])); }
     function activeProvider() { return providerConfig[state.provider]; }
+    function normalizeProjectMemory(items) {
+      return (Array.isArray(items) ? items : []).map((item) => ({
+        site: item.site || "",
+        customer: item.customer || "",
+        customerRole: item.customerRole || "",
+        oem: item.oem || item.affectedCustomer || "",
+        product: item.product || "",
+        project: item.project || ""
+      }));
+    }
+    function normalizeApiConfig(config) {
+      const base = JSON.parse(JSON.stringify(defaultApiConfig));
+      const source = config && typeof config === "object" ? config : {};
+      base.defaultProvider = source.defaultProvider || base.defaultProvider;
+      Object.keys(base.providers).forEach((key) => {
+        const next = source.providers?.[key] || {};
+        base.providers[key] = {
+          enabled: next.enabled !== undefined ? !!next.enabled : base.providers[key].enabled,
+          baseUrl: next.baseUrl || base.providers[key].baseUrl,
+          model: next.model || base.providers[key].model,
+          apiKey: next.apiKey || base.providers[key].apiKey
+        };
+      });
+      base.updatedAt = source.updatedAt || "";
+      base.updatedBy = source.updatedBy || "";
+      return base;
+    }
+    function csvEscape(value) {
+      const text = String(value ?? "");
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+    function parseCsvLine(line) {
+      const result = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i += 1; }
+          else inQuotes = !inQuotes;
+        } else if (char === "," && !inQuotes) {
+          result.push(current);
+          current = "";
+        } else current += char;
+      }
+      result.push(current);
+      return result.map((item) => item.trim());
+    }
+    function serializeProjectCsv(items) {
+      return ["site,customer,customerRole,oem,product,project"].concat(items.map((item) => [item.site, item.customer, item.customerRole || "", item.oem || "", item.product, item.project].map(csvEscape).join(","))).join("\n");
+    }
+    function parseProjectCsv(text) {
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length < 2) return normalizeProjectMemory(defaultProjectMemory);
+      return lines.slice(1).map((line) => {
+        const [site="", customer="", customerRole="", oem="", product="", project=""] = parseCsvLine(line);
+        return { site, customer, customerRole, oem, product, project };
+      }).filter((item) => item.site && item.customer && item.product && item.project);
+    }
+    function serializeGlossaryCsv(items) {
+      return ["zh,en,category,ipc,note"].concat(items.map((item) => [item.zh, item.en, item.category || "", item.ipc || "", item.note || ""].map(csvEscape).join(","))).join("\n");
+    }
+    function parseGlossaryCsv(text) {
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length < 2) return JSON.parse(JSON.stringify(defaultGlossary));
+      return lines.slice(1).map((line) => {
+        const [zh="", en="", category="", ipc="", note=""] = parseCsvLine(line);
+        return { zh, en, category, ipc, note };
+      }).filter((item) => item.zh && item.en);
+    }
+    function updateSharedStatusText(message) {
+      el.sharedStatusText.textContent = message;
+      state.sharedPathLabel = message;
+    }
+    function renderProviderSelectOptions() {
+      const available = Object.entries(providerConfig).filter(([key]) => state.apiConfig.providers[key]?.enabled !== false);
+      const nextProvider = available.some(([key]) => key === state.provider) ? state.provider : (state.apiConfig.defaultProvider || available[0]?.[0] || "deepseek");
+      state.provider = nextProvider;
+      el.providerSelect.innerHTML = available.map(([key, provider]) => `<option value="${key}">${provider.label}</option>`).join("");
+      el.providerSelect.value = nextProvider;
+    }
+    function renderApiConfigPage() {
+      el.defaultProviderSelect.innerHTML = Object.entries(providerConfig).map(([key, provider]) => `<option value="${key}">${provider.label}</option>`).join("");
+      el.defaultProviderSelect.value = state.apiConfig.defaultProvider || "deepseek";
+      el.apiProviderEditor.innerHTML = Object.entries(providerConfig).map(([key, provider]) => {
+        const item = state.apiConfig.providers[key];
+        return `<div class="output-box" style="margin-bottom:14px;"><div class="field-grid"><div class="field"><label for="api-enabled-${key}">${provider.label} 啟用</label><select id="api-enabled-${key}"><option value="true"${item.enabled ? " selected" : ""}>啟用</option><option value="false"${!item.enabled ? " selected" : ""}>停用</option></select></div><div class="field"><label for="api-model-${key}">Model</label><input id="api-model-${key}" value="${(item.model || "").replace(/"/g, "&quot;")}"></div></div><div class="field"><label for="api-url-${key}">Base URL</label><input id="api-url-${key}" value="${(item.baseUrl || "").replace(/"/g, "&quot;")}"></div><div class="field"><label for="api-key-${key}">API Key</label><input id="api-key-${key}" type="password" value="${(item.apiKey || "").replace(/"/g, "&quot;")}"></div></div>`;
+      }).join("");
+      const meta = state.apiConfig.updatedAt ? `最後更新：${state.apiConfig.updatedAt}${state.apiConfig.updatedBy ? ` / ${state.apiConfig.updatedBy}` : ""}` : "尚未寫入共享 API 設定";
+      setNotice(el.apiNotice, meta, state.apiConfig.updatedAt ? "good" : "warn");
+    }
 
     function setNotice(target, message, kind) {
       if (!message) {
@@ -399,6 +529,21 @@
     function switchPage(pageName) {
       Object.entries(el.pages).forEach(([name, page]) => page.classList.toggle("active", name === pageName));
       el.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.page === pageName));
+    }
+    function openMaintenanceLogin(targetPage) {
+      openModal("維護頁登入", `<p class="section-desc">非主畫面頁面已上鎖。請輸入維護密碼與維護者名稱。</p><div class="field-grid"><div class="field"><label for="maintainerName">維護者名稱</label><input id="maintainerName" value="${state.maintainerName.replace(/"/g, "&quot;")}" placeholder="例如 CQE Owner"></div><div class="field"><label for="maintainerPassword">密碼</label><input id="maintainerPassword" type="password" placeholder="請輸入維護密碼"></div></div><div class="actions"><button id="unlockMaintenanceBtn" class="btn-accent" type="button">解鎖</button></div>`, () => {
+        document.getElementById("unlockMaintenanceBtn").addEventListener("click", () => {
+          const name = document.getElementById("maintainerName").value.trim();
+          const password = document.getElementById("maintainerPassword").value.trim();
+          if (password !== MAINTAINER_PASSWORD) { setNotice(el.mainNotice, "維護密碼錯誤。", "bad"); return; }
+          state.maintenanceUnlocked = true;
+          state.maintainerName = name || "維護者";
+          localStorage.setItem(STORAGE_KEYS.maintainer, state.maintainerName);
+          closeModal();
+          switchPage(targetPage);
+          setNotice(el.mainNotice, `維護模式已解鎖：${state.maintainerName}`, "good");
+        });
+      });
     }
 
     function renderTemplateSelect() {
@@ -423,9 +568,13 @@
       });
       el.fieldGrid.innerHTML = "";
       el.fieldGrid.appendChild(grid);
+      const missingKeys = new Set(computeMissingFields().map((field) => field.key));
+      const riskKeys = new Set(state.highRiskFields);
       template.fields.forEach((field) => {
         const input = document.getElementById(`field-${field.key}`);
         input.value = state.fieldValues[field.key] || "";
+        if (missingKeys.has(field.key)) input.classList.add("input-missing");
+        else if (riskKeys.has(field.key)) input.classList.add("input-risk");
         input.addEventListener("input", (event) => {
           state.fieldValues[field.key] = event.target.value;
           if (!event.target.value.trim()) delete state.zhHints[field.key];
@@ -434,10 +583,12 @@
       });
     }
 
-    function setTemplate(templateId, nextValues, nextZhHints) {
+    function setTemplate(templateId, nextValues, nextZhHints, nextHighRiskFields, nextReviewerQuestions) {
       state.currentTemplateId = templateId;
       state.fieldValues = { ...defaultValues(templateId), ...(nextValues || {}) };
       state.zhHints = { ...(nextZhHints || {}) };
+      state.highRiskFields = Array.isArray(nextHighRiskFields) ? nextHighRiskFields : [];
+      state.reviewerQuestions = Array.isArray(nextReviewerQuestions) ? nextReviewerQuestions : [];
       el.templateSelect.value = templateId;
       renderTemplateInfo();
       renderFields();
@@ -495,13 +646,10 @@
       else setNotice(el.missingNotice, "", "");
     }
 
-    function saveProviderKey() { localStorage.setItem(activeProvider().keyStorage, el.apiKey.value.trim()); }
-
     function loadProviderState() {
-      state.provider = localStorage.getItem(STORAGE_KEYS.provider) || "deepseek";
-      el.providerSelect.value = state.provider;
-      el.apiKey.placeholder = activeProvider().placeholder;
-      el.apiKey.value = localStorage.getItem(activeProvider().keyStorage) || "";
+      state.apiConfig = normalizeApiConfig(state.apiConfig);
+      state.provider = localStorage.getItem(STORAGE_KEYS.provider) || state.apiConfig.defaultProvider || "deepseek";
+      renderProviderSelectOptions();
     }
 
     function buildTemplateCatalogText() {
@@ -511,26 +659,151 @@
       }).join("\n\n");
     }
 
-    function buildProjectMemoryText() { return state.projectMemory.map((item) => `${item.site} | ${item.customer} | ${item.customerRole} | ${item.affectedCustomer || "-"} | ${item.product} | ${item.project}`).join("\n"); }
+    function buildProjectMemoryText() { return state.projectMemory.map((item) => `${item.site} | ${item.customer} | ${item.customerRole} | ${item.oem || "-"} | ${item.product} | ${item.project}`).join("\n"); }
     function buildGlossaryText() { return state.glossary.map((item) => `${item.zh} => ${item.en}${item.category ? ` [${item.category}]` : ""}`).join("\n"); }
     function buildSiteMasterText() { return defaultSiteMaster.map((item) => `${item.code}: ${item.aliases.join(", ")}`).join("\n"); }
     function buildIndicatorRulesText() { return defaultIndicatorRules.map((item) => `${item.code}: ${item.meaning}; hints=${item.hints.join(", ")}`).join("\n"); }
+    function localizeReviewerText(text) {
+      const source = (text || "").trim();
+      if (!source) return "";
+      let result = source;
+      const replacements = [
+        [/^please confirm /i, "請確認"],
+        [/based on project memory/gi, "依據專案對照表"],
+        [/the site/gi, "Site"],
+        [/the complaint category/gi, "客訴類別"],
+        [/the location/gi, "發現位置"],
+        [/the date/gi, "日期"],
+        [/is it /gi, "是否為"],
+        [/or another Inventec site/gi, "或其他英業達 site"],
+        [/or another stage/gi, "或其他階段"],
+        [/Tier1 line finding/gi, "Tier1 產線發現"],
+        [/found during incoming inspection/gi, "客戶入料檢驗發現"],
+        [/specifically/gi, "明確為"],
+        [/or another location/gi, "或其他位置"],
+        [/customer plant/gi, "客戶工廠"],
+        [/correct/gi, "正確"],
+        [/or should it be a different year/gi, "或年份是否應為其他年度"],
+        [/e\.g\./gi, "例如"],
+        [/site/gi, "Site"],
+        [/location/gi, "位置"],
+        [/date/gi, "日期"]
+      ];
+      replacements.forEach(([pattern, replacement]) => {
+        result = result.replace(pattern, replacement);
+      });
+      result = result
+        .replace(/\s+:/g, "：")
+        .replace(/: /g, "：")
+        .replace(/\?$/g, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      if (/^請確認/i.test(result) || /^Site|^客訴類別|^位置|^日期/.test(result)) return result;
+      return `請確認：${result}`;
+    }
+    function localizeReviewerTexts(items) {
+      return (Array.isArray(items) ? items : []).map((item) => localizeReviewerText(item)).filter(Boolean);
+    }
+    async function getSharedDataHandle(dirHandle, createIfMissing) {
+      try {
+        return await dirHandle.getDirectoryHandle("data", { create:createIfMissing });
+      } catch {
+        return dirHandle;
+      }
+    }
+    async function readSharedFileText(dirHandle, fileName) {
+      const dataDir = await getSharedDataHandle(dirHandle, false);
+      const fileHandle = await dataDir.getFileHandle(fileName);
+      const file = await fileHandle.getFile();
+      return file.text();
+    }
+    async function writeSharedFileText(dirHandle, fileName, content) {
+      const dataDir = await getSharedDataHandle(dirHandle, true);
+      const fileHandle = await dataDir.getFileHandle(fileName, { create:true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    }
+    async function ensureSharedDefaults(dirHandle) {
+      const defaults = {
+        [SHARED_FILES.project]: serializeProjectCsv(normalizeProjectMemory(defaultProjectMemory)),
+        [SHARED_FILES.glossary]: serializeGlossaryCsv(defaultGlossary),
+        [SHARED_FILES.version]: JSON.stringify(defaultVersionLogs, null, 2),
+        [SHARED_FILES.api]: JSON.stringify(normalizeApiConfig(defaultApiConfig), null, 2)
+      };
+      const dataDir = await getSharedDataHandle(dirHandle, true);
+      for (const [fileName, content] of Object.entries(defaults)) {
+        try { await dataDir.getFileHandle(fileName); }
+        catch { await writeSharedFileText(dirHandle, fileName, content); }
+      }
+    }
+    async function loadSharedData(dirHandle) {
+      await ensureSharedDefaults(dirHandle);
+      state.projectMemory = normalizeProjectMemory(parseProjectCsv(await readSharedFileText(dirHandle, SHARED_FILES.project)));
+      state.glossary = parseGlossaryCsv(await readSharedFileText(dirHandle, SHARED_FILES.glossary));
+      state.versionLogs = JSON.parse(await readSharedFileText(dirHandle, SHARED_FILES.version));
+      state.apiConfig = normalizeApiConfig(JSON.parse(await readSharedFileText(dirHandle, SHARED_FILES.api)));
+      saveJson(STORAGE_KEYS.project, state.projectMemory);
+      saveJson(STORAGE_KEYS.glossary, state.glossary);
+      saveJson(STORAGE_KEYS.version, state.versionLogs);
+      saveJson(STORAGE_KEYS.apiConfig, state.apiConfig);
+      state.sharedConnected = true;
+      updateSharedStatusText(`已連線：${dirHandle.name}\\data`);
+      renderProjectTable();
+      renderGlossaryTable();
+      renderVersionLogs();
+      refreshCounts();
+      renderProviderSelectOptions();
+      renderApiConfigPage();
+    }
+    async function persistSharedFile(kind) {
+      if (!state.sharedDirHandle) return;
+      const contentMap = {
+        project: serializeProjectCsv(state.projectMemory),
+        glossary: serializeGlossaryCsv(state.glossary),
+        version: JSON.stringify(state.versionLogs, null, 2),
+        api: JSON.stringify(state.apiConfig, null, 2)
+      };
+      await writeSharedFileText(state.sharedDirHandle, SHARED_FILES[kind], contentMap[kind]);
+    }
+    async function connectSharedFolder() {
+      if (!window.showDirectoryPicker) {
+        setNotice(el.mainNotice, "目前瀏覽器不支援共享資料夾寫入。請改用新版 Edge/Chrome。", "bad");
+        return;
+      }
+      const dirHandle = await window.showDirectoryPicker({ mode:"readwrite" });
+      state.sharedDirHandle = dirHandle;
+      await loadSharedData(dirHandle);
+      setNotice(el.mainNotice, "已載入共享資料夾主資料。", "good");
+    }
+    function ensureSharedConnected() {
+      if (state.sharedDirHandle) return true;
+      setNotice(el.mainNotice, "請先按「連線共享資料夾」，再進行維護資料儲存。", "warn");
+      return false;
+    }
 
     async function callAi(input) {
-      const apiKey = el.apiKey.value.trim();
+      const apiKey = state.apiConfig.providers[state.provider]?.apiKey?.trim();
       if (!apiKey) throw new Error("未提供 API Key");
       const prompt = [
         "You are an expert CQE weekly report assistant.",
-        "You are a patient CQE reviewer and coach.",
+        "Your role is a patient reviewer and supporter for frontline engineers who communicate with customers and need to produce weekly report summaries quickly.",
+        "Your first job is to help the engineer complete a solid draft quickly.",
+        "Your second job is to review that draft carefully and point out what must be confirmed, corrected, or supplemented.",
+        "The frontline engineer knows the real field situation better than you do. Never act like you know the现场 better than the engineer.",
+        "When information is uncertain, incomplete, or ambiguous, do not over-assert. Fill what can be reasonably drafted, and clearly tell the engineer what still needs confirmation.",
         "First review the engineer text carefully, then choose the best templateId from the catalog.",
-        "Extract structured field values from the user input.",
+        "Extract structured field values from the user input and prepare a usable first draft.",
         "Do not guess site from project name. Site must be an Inventec site code only, such as IPT / ITE / IME / TAO / ICZ.",
-        "Do not use downstream OEM as the direct customer when the notifier is Tier1. In complaints, customer means the direct complainant to Inventec; downstream OEM should go to affectedCustomer.",
+        "Do not use downstream OEM as the direct customer when the notifier is Tier1. In complaints, customer means the direct complainant to Inventec; downstream OEM should go to oem.",
         "For complaintCategory, select one of IQC / VLRR / 0KM / FR based on the finding stage definitions. If you cannot determine it, leave it empty and ask the engineer to confirm.",
         "If the original input is in English, also provide Chinese display values for non-proper-noun fields when possible.",
         "Do not fabricate precise facts. Unknown required fields should be empty string.",
         "Allowed fallback text for unknown user-confirmed fields: TBD or NA.",
-        "Return review notes that tell the engineer what is missing or what assumption is risky.",
+        "Return review notes that help the engineer revise quickly.",
+        "Return reviewerQuestions for items that the engineer should confirm from the frontline context.",
+        "Return highRiskFields for fields that were inferred with risk or need engineer confirmation.",
+        "Prefer practical, supportive review comments such as 'please confirm site', 'please confirm whether this is VLRR or IQC', or 'please confirm direct customer vs downstream OEM'.",
         "Inventec site master:",
         buildSiteMasterText(),
         "Indicator rules:",
@@ -541,7 +814,8 @@
         buildGlossaryText(),
         "Template catalog:",
         buildTemplateCatalogText(),
-        'Return strict JSON only with this shape: {"templateId":"...","values":{"fieldKey":"..."},"valuesZh":{"fieldKey":"..."},"confidence":0.0,"notes":["..."],"reviewerQuestions":["..."]}'
+        'Return strict JSON only with this shape: {"templateId":"...","values":{"fieldKey":"..."},"valuesZh":{"fieldKey":"..."},"confidence":0.0,"notes":["..."],"reviewerQuestions":["..."],"highRiskFields":["fieldKey"]}',
+        "Confidence should reflect how safe your draft is, not how fluent it sounds."
       ].join("\n\n");
       const request = activeProvider().buildRequest(prompt, input, apiKey);
       const response = await fetch(request.url, request.options);
@@ -566,8 +840,13 @@
     }
 
     function openMissingDialog(missingFields) {
-      const rows = missingFields.map((field) => `<div class="field"><label for="missing-${field.key}">${field.label}</label><input id="missing-${field.key}" value="${(state.fieldValues[field.key] || "").replace(/"/g, "&quot;")}" placeholder="可填 TBD 或 NA"></div>`).join("");
-      openModal("補齊缺失資訊", `<p class="section-desc">下列欄位為必填。若目前沒有資訊，可填入 <span class="mono">TBD</span> 或 <span class="mono">NA</span>。</p><div class="field-grid">${rows}</div><div class="actions"><button id="saveMissingBtn" class="btn-accent" type="button">儲存並更新</button></div>`, () => {
+      const rows = missingFields.map((field) => `<div class="field"><label for="missing-${field.key}">${field.label}</label><input id="missing-${field.key}" value="${(state.fieldValues[field.key] || "").replace(/"/g, "&quot;")}" placeholder="可填 TBD 或 NA"><div class="actions" style="margin-top:8px;"><button class="btn-soft" type="button" data-fill="${field.key}" data-value="TBD">TBD</button><button class="btn-soft" type="button" data-fill="${field.key}" data-value="NA">NA</button></div></div>`).join("");
+      openModal("補齊缺失資訊", `<p class="section-desc">下列欄位為必填。若目前沒有資訊，可直接填入 <span class="mono">TBD</span> 或 <span class="mono">NA</span>。</p><div class="field-grid">${rows}</div><div class="actions"><button id="saveMissingBtn" class="btn-accent" type="button">儲存並更新</button></div>`, () => {
+        document.querySelectorAll("[data-fill]").forEach((button) => {
+          button.addEventListener("click", () => {
+            document.getElementById(`missing-${button.dataset.fill}`).value = button.dataset.value;
+          });
+        });
         document.getElementById("saveMissingBtn").addEventListener("click", () => {
           missingFields.forEach((field) => { state.fieldValues[field.key] = document.getElementById(`missing-${field.key}`).value.trim(); });
           renderFields();
@@ -578,15 +857,46 @@
       });
     }
 
+    function openReviewDialog(highRiskFields, reviewerQuestions) {
+      const uniqueFields = [...new Set(highRiskFields)];
+      const localizedQuestions = localizeReviewerTexts(reviewerQuestions);
+      const rows = uniqueFields.map((key) => {
+        const template = getTemplateById(state.currentTemplateId);
+        const field = template.fields.find((item) => item.key === key);
+        if (!field) return "";
+        return `<div class="field"><label for="review-${field.key}">${field.label}</label><input id="review-${field.key}" value="${(state.fieldValues[field.key] || "").replace(/"/g, "&quot;")}" placeholder="請確認，可填 TBD 或 NA"><div class="actions" style="margin-top:8px;"><button class="btn-soft" type="button" data-review-fill="${field.key}" data-value="TBD">TBD</button><button class="btn-soft" type="button" data-review-fill="${field.key}" data-value="NA">NA</button></div></div>`;
+      }).join("");
+      const notes = localizedQuestions.length ? localizedQuestions.map((item) => `<div>• ${item}</div>`).join("") : "<div>請確認高風險欄位。</div>";
+      openModal("請確認高風險推定欄位", `<p class="section-desc">AI 已完成初稿，但以下欄位屬高風險推定，需要工程師確認。</p><div class="notice warn">${notes}</div><div class="field-grid" style="margin-top:14px;">${rows}</div><div class="actions"><button id="saveReviewBtn" class="btn-accent" type="button">儲存並更新</button></div>`, () => {
+        document.querySelectorAll("[data-review-fill]").forEach((button) => {
+          button.addEventListener("click", () => {
+            document.getElementById(`review-${button.dataset.reviewFill}`).value = button.dataset.value;
+          });
+        });
+        document.getElementById("saveReviewBtn").addEventListener("click", () => {
+          uniqueFields.forEach((key) => {
+            const input = document.getElementById(`review-${key}`);
+            if (input) state.fieldValues[key] = input.value.trim();
+          });
+          closeModal();
+          renderFields();
+          renderSummaries();
+          setNotice(el.mainNotice, "高風險欄位已更新。", "good");
+        });
+      });
+    }
+
     function openVersionDialog() {
       openModal("新增進版紀錄", `<div class="field-grid"><div class="field"><label for="versionNo">版號</label><input id="versionNo" placeholder="v0.2.1-beta"></div><div class="field"><label for="versionDate">日期</label><input id="versionDate" placeholder="2026-03-10"></div></div><div class="field"><label for="versionChanges">變更內容</label><textarea id="versionChanges" placeholder="一行一項變更"></textarea></div><div class="actions"><button id="saveVersionBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
-        document.getElementById("saveVersionBtn").addEventListener("click", () => {
+        document.getElementById("saveVersionBtn").addEventListener("click", async () => {
+          if (!ensureSharedConnected()) return;
           const version = document.getElementById("versionNo").value.trim();
           const date = document.getElementById("versionDate").value.trim();
           const changes = document.getElementById("versionChanges").value.split("\n").map((item) => item.trim()).filter(Boolean);
           if (!version || !date || !changes.length) return;
           state.versionLogs.unshift({ version, date, changes });
           saveJson(STORAGE_KEYS.version, state.versionLogs);
+          await persistSharedFile("version");
           renderVersionLogs();
           closeModal();
         });
@@ -594,13 +904,15 @@
     }
 
     function openProjectDialog(index = null) {
-      const item = index === null ? { site:"IPT", customer:"", customerRole:"Tier1", affectedCustomer:"", product:"", project:"" } : state.projectMemory[index];
-      openModal(index === null ? "新增專案對照" : "修改專案對照", `<div class="field-grid"><div class="field"><label for="projectSite">Site</label><input id="projectSite" value="${item.site.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectCustomer">Customer</label><input id="projectCustomer" value="${item.customer.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="projectRole">Customer Role</label><input id="projectRole" value="${item.customerRole.replace(/"/g, "&quot;")}" placeholder="Tier1 / OEM"></div><div class="field"><label for="projectAffected">Affected Customer</label><input id="projectAffected" value="${(item.affectedCustomer || "").replace(/"/g, "&quot;")}" placeholder="Volvo / optional"></div></div><div class="field-grid"><div class="field"><label for="projectProduct">Product</label><input id="projectProduct" value="${item.product.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectName">Project</label><input id="projectName" value="${item.project.replace(/"/g, "&quot;")}"></div></div><div class="actions"><button id="saveProjectBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
-        document.getElementById("saveProjectBtn").addEventListener("click", () => {
-          const next = { site:document.getElementById("projectSite").value.trim(), customer:document.getElementById("projectCustomer").value.trim(), customerRole:document.getElementById("projectRole").value.trim(), affectedCustomer:document.getElementById("projectAffected").value.trim(), product:document.getElementById("projectProduct").value.trim(), project:document.getElementById("projectName").value.trim() };
+      const item = index === null ? { site:"IPT", customer:"", customerRole:"Tier1", oem:"", product:"", project:"" } : state.projectMemory[index];
+      openModal(index === null ? "新增專案對照" : "修改專案對照", `<div class="field-grid"><div class="field"><label for="projectSite">Site</label><input id="projectSite" value="${item.site.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectCustomer">Customer</label><input id="projectCustomer" value="${item.customer.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="projectRole">Customer Role</label><input id="projectRole" value="${item.customerRole.replace(/"/g, "&quot;")}" placeholder="Tier1 / OEM"></div><div class="field"><label for="projectOem">OEM</label><input id="projectOem" value="${(item.oem || "").replace(/"/g, "&quot;")}" placeholder="Volvo / optional"></div></div><div class="field-grid"><div class="field"><label for="projectProduct">Product</label><input id="projectProduct" value="${item.product.replace(/"/g, "&quot;")}"></div><div class="field"><label for="projectName">Project</label><input id="projectName" value="${item.project.replace(/"/g, "&quot;")}"></div></div><div class="actions"><button id="saveProjectBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
+        document.getElementById("saveProjectBtn").addEventListener("click", async () => {
+          if (!ensureSharedConnected()) return;
+          const next = { site:document.getElementById("projectSite").value.trim(), customer:document.getElementById("projectCustomer").value.trim(), customerRole:document.getElementById("projectRole").value.trim(), oem:document.getElementById("projectOem").value.trim(), product:document.getElementById("projectProduct").value.trim(), project:document.getElementById("projectName").value.trim() };
           if (!next.site || !next.customer || !next.product || !next.project) return;
           if (index === null) state.projectMemory.push(next); else state.projectMemory[index] = next;
           saveJson(STORAGE_KEYS.project, state.projectMemory);
+          await persistSharedFile("project");
           renderProjectTable();
           refreshCounts();
           closeModal();
@@ -611,11 +923,13 @@
     function openGlossaryDialog(index = null) {
       const item = index === null ? { zh:"", en:"", category:"", ipc:"", note:"" } : state.glossary[index];
       openModal(index === null ? "新增專有名詞" : "修改專有名詞", `<div class="field-grid"><div class="field"><label for="termZh">中文</label><input id="termZh" value="${item.zh.replace(/"/g, "&quot;")}"></div><div class="field"><label for="termEn">英文</label><input id="termEn" value="${item.en.replace(/"/g, "&quot;")}"></div></div><div class="field-grid"><div class="field"><label for="termCategory">分類</label><input id="termCategory" value="${item.category.replace(/"/g, "&quot;")}" placeholder="Defect / Status / Soldering"></div><div class="field"><label for="termIpc">IPC-610 條目</label><input id="termIpc" value="${item.ipc.replace(/"/g, "&quot;")}" placeholder="例如 IPC-610 solder criteria"></div></div><div class="field"><label for="termNote">備註</label><input id="termNote" value="${item.note.replace(/"/g, "&quot;")}"></div><div class="actions"><button id="saveGlossaryBtn" class="btn-accent" type="button">儲存</button></div>`, () => {
-        document.getElementById("saveGlossaryBtn").addEventListener("click", () => {
+        document.getElementById("saveGlossaryBtn").addEventListener("click", async () => {
+          if (!ensureSharedConnected()) return;
           const next = { zh:document.getElementById("termZh").value.trim(), en:document.getElementById("termEn").value.trim(), category:document.getElementById("termCategory").value.trim(), ipc:document.getElementById("termIpc").value.trim(), note:document.getElementById("termNote").value.trim() };
           if (!next.zh || !next.en) return;
           if (index === null) state.glossary.push(next); else state.glossary[index] = next;
           saveJson(STORAGE_KEYS.glossary, state.glossary);
+          await persistSharedFile("glossary");
           renderGlossaryTable();
           refreshCounts();
           closeModal();
@@ -625,21 +939,24 @@
 
     function openCsvDialog(type) {
       const isProject = type === "project";
-      const header = isProject ? "site,customer,customerRole,affectedCustomer,product,project" : "zh,en,category,ipc,note";
-      const rows = isProject ? state.projectMemory.map((item) => `${item.site},${item.customer},${item.customerRole || ""},${item.affectedCustomer || ""},${item.product},${item.project}`).join("\n") : state.glossary.map((item) => `${item.zh},${item.en},${item.category},${item.ipc},${item.note}`).join("\n");
+      const header = isProject ? "site,customer,customerRole,oem,product,project" : "zh,en,category,ipc,note";
+      const rows = isProject ? state.projectMemory.map((item) => `${item.site},${item.customer},${item.customerRole || ""},${item.oem || ""},${item.product},${item.project}`).join("\n") : state.glossary.map((item) => `${item.zh},${item.en},${item.category},${item.ipc},${item.note}`).join("\n");
       openModal(isProject ? "專案對照表 CSV" : "專有名詞 CSV", `<p class="section-desc">第一行欄位固定為 <span class="mono">${header}</span>。可直接貼上 CSV 覆蓋匯入，或複製下方內容匯出。</p><div class="field"><label for="csvData">CSV</label><textarea id="csvData" style="min-height:260px;">${header}\n${rows}</textarea></div><div class="actions"><button id="importCsvBtn" class="btn-accent" type="button">匯入覆蓋</button><button id="copyCsvBtn" class="btn-soft" type="button">複製 CSV</button></div>`, () => {
         document.getElementById("copyCsvBtn").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("csvData").value); });
-        document.getElementById("importCsvBtn").addEventListener("click", () => {
+        document.getElementById("importCsvBtn").addEventListener("click", async () => {
+          if (!ensureSharedConnected()) return;
           const lines = document.getElementById("csvData").value.split("\n").map((line) => line.trim()).filter(Boolean);
           if (lines.length < 2) return;
           const dataLines = lines.slice(1);
           if (isProject) {
-            state.projectMemory = dataLines.map((line) => { const [site="", customer="", customerRole="", affectedCustomer="", product="", project=""] = line.split(","); return { site:site.trim(), customer:customer.trim(), customerRole:customerRole.trim(), affectedCustomer:affectedCustomer.trim(), product:product.trim(), project:project.trim() }; }).filter((item) => item.site && item.customer && item.product && item.project);
+            state.projectMemory = parseProjectCsv(lines.join("\n"));
             saveJson(STORAGE_KEYS.project, state.projectMemory);
+            await persistSharedFile("project");
             renderProjectTable();
           } else {
-            state.glossary = dataLines.map((line) => { const [zh="", en="", category="", ipc="", note=""] = line.split(","); return { zh:zh.trim(), en:en.trim(), category:category.trim(), ipc:ipc.trim(), note:note.trim() }; }).filter((item) => item.zh && item.en);
+            state.glossary = parseGlossaryCsv(lines.join("\n"));
             saveJson(STORAGE_KEYS.glossary, state.glossary);
+            await persistSharedFile("glossary");
             renderGlossaryTable();
           }
           refreshCounts();
@@ -653,15 +970,15 @@
     }
 
     function renderProjectTable() {
-      el.projectTableBody.innerHTML = state.projectMemory.map((item, index) => `<tr><td>${item.site}</td><td>${item.customer}</td><td>${item.customerRole || ""}</td><td>${item.affectedCustomer || ""}</td><td>${item.product}</td><td>${item.project}</td><td><div class="actions"><button class="btn-soft" type="button" data-project-edit="${index}">修改</button><button class="btn-danger" type="button" data-project-del="${index}">刪除</button></div></td></tr>`).join("");
+      el.projectTableBody.innerHTML = state.projectMemory.map((item, index) => `<tr><td>${item.site}</td><td>${item.customer}</td><td>${item.customerRole || ""}</td><td>${item.oem || ""}</td><td>${item.product}</td><td>${item.project}</td><td><div class="actions"><button class="btn-soft" type="button" data-project-edit="${index}">修改</button><button class="btn-danger" type="button" data-project-del="${index}">刪除</button></div></td></tr>`).join("");
       el.projectTableBody.querySelectorAll("[data-project-edit]").forEach((button) => button.addEventListener("click", () => openProjectDialog(Number(button.dataset.projectEdit))));
-      el.projectTableBody.querySelectorAll("[data-project-del]").forEach((button) => button.addEventListener("click", () => { state.projectMemory.splice(Number(button.dataset.projectDel), 1); saveJson(STORAGE_KEYS.project, state.projectMemory); renderProjectTable(); refreshCounts(); }));
+      el.projectTableBody.querySelectorAll("[data-project-del]").forEach((button) => button.addEventListener("click", async () => { if (!ensureSharedConnected()) return; state.projectMemory.splice(Number(button.dataset.projectDel), 1); saveJson(STORAGE_KEYS.project, state.projectMemory); await persistSharedFile("project"); renderProjectTable(); refreshCounts(); }));
     }
 
     function renderGlossaryTable() {
       el.glossaryTableBody.innerHTML = state.glossary.map((item, index) => `<tr><td>${item.zh}</td><td>${item.en}</td><td>${item.category || ""}</td><td>${item.ipc || ""}</td><td>${item.note || ""}</td><td><div class="actions"><button class="btn-soft" type="button" data-glossary-edit="${index}">修改</button><button class="btn-danger" type="button" data-glossary-del="${index}">刪除</button></div></td></tr>`).join("");
       el.glossaryTableBody.querySelectorAll("[data-glossary-edit]").forEach((button) => button.addEventListener("click", () => openGlossaryDialog(Number(button.dataset.glossaryEdit))));
-      el.glossaryTableBody.querySelectorAll("[data-glossary-del]").forEach((button) => button.addEventListener("click", () => { state.glossary.splice(Number(button.dataset.glossaryDel), 1); saveJson(STORAGE_KEYS.glossary, state.glossary); renderGlossaryTable(); refreshCounts(); }));
+      el.glossaryTableBody.querySelectorAll("[data-glossary-del]").forEach((button) => button.addEventListener("click", async () => { if (!ensureSharedConnected()) return; state.glossary.splice(Number(button.dataset.glossaryDel), 1); saveJson(STORAGE_KEYS.glossary, state.glossary); await persistSharedFile("glossary"); renderGlossaryTable(); refreshCounts(); }));
     }
 
     function refreshCounts() {
@@ -682,15 +999,18 @@
       setNotice(el.mainNotice, "", "");
       state.aiConfidence = null;
       try {
-        saveProviderKey();
         const parsed = await callAi(input);
         const templateId = getTemplateById(parsed.templateId || templates[0].id).id;
         state.aiConfidence = typeof parsed.confidence === "number" ? parsed.confidence : null;
-        setTemplate(templateId, parsed.values || {}, parsed.valuesZh || {});
+        const highRiskFields = Array.isArray(parsed.highRiskFields) ? parsed.highRiskFields : [];
+        const reviewerQuestions = Array.isArray(parsed.reviewerQuestions) ? parsed.reviewerQuestions : [];
+        const localizedQuestions = localizeReviewerTexts(reviewerQuestions);
+        setTemplate(templateId, parsed.values || {}, parsed.valuesZh || {}, highRiskFields, reviewerQuestions);
         const missingFields = computeMissingFields();
-        const notes = Array.isArray(parsed.notes) && parsed.notes.length ? ` AI notes: ${parsed.notes.join(" | ")}` : "";
-        const reviewerQuestions = Array.isArray(parsed.reviewerQuestions) && parsed.reviewerQuestions.length ? ` 請確認：${parsed.reviewerQuestions.join(" | ")}` : "";
-        setNotice(el.mainNotice, `${activeProvider().label} 已完成模板判斷與欄位帶入。${notes}${reviewerQuestions}`, reviewerQuestions ? "warn" : "good");
+        const notes = Array.isArray(parsed.notes) && parsed.notes.length ? ` AI 審查意見：${parsed.notes.join(" | ")}` : "";
+        const reviewerText = localizedQuestions.length ? ` 請確認：${localizedQuestions.join(" | ")}` : "";
+        setNotice(el.mainNotice, `${activeProvider().label} 已先完成初稿，並標出需要工程師確認的內容。${notes}${reviewerText}`, reviewerQuestions.length || highRiskFields.length ? "warn" : "good");
+        if (highRiskFields.length) openReviewDialog(highRiskFields, reviewerQuestions);
         if (missingFields.length) openMissingDialog(missingFields);
       } catch (error) {
         setNotice(el.mainNotice, `${activeProvider().label} 呼叫失敗：${error.message}。若公司網域限制直連模型，請改用手動模式。`, "bad");
@@ -701,16 +1021,19 @@
     }
 
     function initEvents() {
-      el.tabs.forEach((tab) => tab.addEventListener("click", () => switchPage(tab.dataset.page)));
+      el.tabs.forEach((tab) => tab.addEventListener("click", () => {
+        const targetPage = tab.dataset.page;
+        if (tab.dataset.protected === "true" && !state.maintenanceUnlocked) {
+          openMaintenanceLogin(targetPage);
+          return;
+        }
+        switchPage(targetPage);
+      }));
       el.providerSelect.addEventListener("change", () => {
         state.provider = el.providerSelect.value;
         localStorage.setItem(STORAGE_KEYS.provider, state.provider);
-        el.apiKey.placeholder = activeProvider().placeholder;
-        el.apiKey.value = localStorage.getItem(activeProvider().keyStorage) || "";
       });
-      el.apiKey.addEventListener("change", saveProviderKey);
-      el.apiKey.addEventListener("input", saveProviderKey);
-      el.templateSelect.addEventListener("change", () => { state.aiConfidence = null; setTemplate(el.templateSelect.value, {}, {}); });
+      el.templateSelect.addEventListener("change", () => { state.aiConfidence = null; setTemplate(el.templateSelect.value, {}, {}, [], []); });
       el.runAiBtn.addEventListener("click", handleAiGenerate);
       el.manualBtn.addEventListener("click", () => {
         const missingFields = computeMissingFields();
@@ -720,7 +1043,7 @@
       el.clearBtn.addEventListener("click", () => {
         el.rawInput.value = "";
         state.aiConfidence = null;
-        setTemplate(state.currentTemplateId, {}, {});
+        setTemplate(state.currentTemplateId, {}, {}, [], []);
         setNotice(el.mainNotice, "", "");
       });
       el.copyZhBtn.addEventListener("click", () => copyText(el.zhOutput.textContent, "已複製中文 Summary。"));
@@ -731,18 +1054,51 @@
       el.openProjectCsvBtn.addEventListener("click", () => openCsvDialog("project"));
       el.openGlossaryDialogBtn.addEventListener("click", () => openGlossaryDialog());
       el.openGlossaryCsvBtn.addEventListener("click", () => openCsvDialog("glossary"));
+      el.connectSharedBtn.addEventListener("click", async () => {
+        try { await connectSharedFolder(); }
+        catch (error) { setNotice(el.mainNotice, `共享資料夾連線失敗：${error.message}`, "bad"); }
+      });
+      el.reloadSharedBtn.addEventListener("click", async () => {
+        if (!state.sharedDirHandle) { setNotice(el.mainNotice, "尚未連線共享資料夾。", "warn"); return; }
+        try { await loadSharedData(state.sharedDirHandle); setNotice(el.mainNotice, "共享資料已重新載入。", "good"); }
+        catch (error) { setNotice(el.mainNotice, `重新載入失敗：${error.message}`, "bad"); }
+      });
+      el.saveApiConfigBtn.addEventListener("click", async () => {
+        if (!ensureSharedConnected()) { setNotice(el.apiNotice, "請先連線共享資料夾，再儲存 API 設定。", "warn"); return; }
+        const next = normalizeApiConfig({
+          defaultProvider: el.defaultProviderSelect.value,
+          providers: Object.fromEntries(Object.keys(providerConfig).map((key) => [key, {
+            enabled: document.getElementById(`api-enabled-${key}`).value === "true",
+            model: document.getElementById(`api-model-${key}`).value.trim(),
+            baseUrl: document.getElementById(`api-url-${key}`).value.trim(),
+            apiKey: document.getElementById(`api-key-${key}`).value.trim()
+          }])),
+          updatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+          updatedBy: state.maintainerName || "維護者"
+        });
+        state.apiConfig = next;
+        saveJson(STORAGE_KEYS.apiConfig, state.apiConfig);
+        await persistSharedFile("api");
+        renderProviderSelectOptions();
+        renderApiConfigPage();
+        setNotice(el.apiNotice, `API 設定已更新：${state.apiConfig.updatedAt} / ${state.apiConfig.updatedBy}`, "good");
+      });
       el.closeModalBtn.addEventListener("click", closeModal);
       el.modalBackdrop.addEventListener("click", (event) => { if (event.target === el.modalBackdrop) closeModal(); });
     }
 
     function init() {
       loadProviderState();
+      state.projectMemory = normalizeProjectMemory(state.projectMemory);
+      saveJson(STORAGE_KEYS.project, state.projectMemory);
       renderTemplateSelect();
       refreshCounts();
       renderVersionLogs();
       renderProjectTable();
       renderGlossaryTable();
-      setTemplate(state.currentTemplateId, {}, {});
+      renderApiConfigPage();
+      updateSharedStatusText("未連線");
+      setTemplate(state.currentTemplateId, {}, {}, [], []);
       initEvents();
     }
 
