@@ -1,0 +1,6 @@
+keyword,responsible_function,backup_function,notes
+warranty,CQE,AQE,Customer complaint and warranty related topics
+ntf,CQE,MP,No trouble found and return handling
+apqp,AQE,CQE,APQP planning and launch topics
+pfmea,PE,QE,Process risk analysis topics
+control plan,QE,PE,Control plan ownership may vary by site

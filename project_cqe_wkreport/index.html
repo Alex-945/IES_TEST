@@ -18,7 +18,8 @@
     .badges,.meta,.actions,.tab-row { display:flex; gap:10px; flex-wrap:wrap; }
     .badge,.meta-item { border:1px solid var(--line); border-radius:999px; padding:8px 12px; font-size:12px; color:var(--muted); background:rgba(255,255,255,.72); }
     .badge.primary { background:var(--accent); border-color:transparent; color:#2a1b00; font-weight:700; }
-    .tab-row { margin:18px 0 0; }
+    .tab-row { margin:18px 0 0; align-items:center; justify-content:space-between; }
+    .tab-set { display:flex; gap:10px; flex-wrap:wrap; }
     .tab { border:1px solid var(--line); background:rgba(255,255,255,.66); color:var(--muted); border-radius:14px; padding:11px 14px; cursor:pointer; font:inherit; font-weight:700; }
     .tab.active { background:rgba(244,176,0,.16); color:var(--text); border-color:rgba(244,176,0,.45); }
     .panel { border-radius:22px; padding:20px; }
@@ -44,6 +45,8 @@
     .btn-soft { background:rgba(255,255,255,.78); color:var(--text); border:1px solid var(--line); }
     .btn-sky { background:var(--accent2); color:#08212b; }
     .btn-danger { background:#fff1f1; color:#a83a3a; border:1px solid rgba(214,90,90,.28); }
+    .btn-alert { background:#d94a4a; color:#fff7f7; border:1px solid rgba(180,34,34,.18); box-shadow:0 12px 26px rgba(217,74,74,.18); }
+    .btn-alert:hover { background:#c63f3f; }
     .notice { border:1px solid var(--line); border-radius:16px; padding:13px 14px; font-size:14px; line-height:1.7; color:var(--muted); background:rgba(255,255,255,.72); }
     .notice.good { border-color:rgba(62,159,103,.28); background:rgba(62,159,103,.08); color:#1d6f45; }
     .notice.warn { border-color:rgba(215,135,39,.28); background:rgba(215,135,39,.08); color:#8b5a16; }
@@ -79,17 +82,20 @@
           <h1>AI 驅動的固定句型總結工具</h1>
           <div class="badges" style="margin-top:12px;">
             <div class="badge primary">測試版</div>
-            <div class="badge">Version: v0.3.0-beta</div>
+            <div class="badge">Version: v0.3.1-beta</div>
             <div class="badge">Status: 未放行</div>
           </div>
           <p class="sub">這是純 HTML 版本，不需要 Node。主流程是工程師貼入原始資訊，AI 先協助完成初稿，再由工程師快速審查、修正與補缺；若 AI 無法使用，也能手動維護模板、專案對照表與專有名詞對應。</p>
         </div>
       </div>
       <div class="tab-row">
-        <button class="tab active" data-page="generator">Summary Tool</button>
-        <button class="tab" data-page="version" data-protected="true">後台維護</button>
-        <button class="tab" data-page="project" data-protected="true">專案對照表</button>
-        <button class="tab" data-page="glossary" data-protected="true">專有名詞對應</button>
+        <div class="tab-set">
+          <button class="tab active" data-page="generator">Summary Tool</button>
+          <button class="tab" data-page="version" data-protected="true">後台維護</button>
+          <button class="tab" data-page="project" data-protected="true">專案對照表</button>
+          <button class="tab" data-page="glossary" data-protected="true">專有名詞對應</button>
+        </div>
+        <button id="feedbackBtn" class="btn-alert" type="button">問題回饋</button>
       </div>
     </section>
 
@@ -218,10 +224,12 @@
   </div>
 
   <script>
+    const APP_VERSION = "v0.3.1-beta";
+    const FEEDBACK_MAIL_TO = "You.alex@inventec.com";
     const STORAGE_KEYS = { provider:"cqe_provider", project:"cqe_project_memory", glossary:"cqe_glossary", version:"cqe_version_log", apiConfig:"cqe_api_config", maintainer:"cqe_maintainer_name" };
     const MAINTAINER_PASSWORD = "CQE";
     const SHARED_FILES = { project:"project-memory.csv", glossary:"glossary.csv", version:"version-log.json", api:"api-config.json" };
-    const defaultVersionLogs = [{ version:"v0.3.0-beta", date:"2026-03-10", changes:["新增半共用模式：主畫面開放使用，維護頁上密碼鎖","加入共享資料夾連線與重新載入入口","專案對照表、專有名詞、進版與 API 設定改為共享檔可同步","新增 API 維護頁，集中管理 provider / base URL / model / API Key","保留個人輸入與輸出不寫回共享資料"] },{ version:"v0.2.0-beta", date:"2026-03-09", changes:["改成多頁籤工具：Summary Tool / 版本進版 / 專案對照表 / 專有名詞對應","加入多模型切換：DeepSeek / GPT(OpenAI) / Gemini","API key 改為依供應商分開暫存","加入缺欄位彈窗，允許工程師補齊或填 TBD / NA","加入專案對照表與術語表的 Dialog 編修與 CSV 匯入 / 匯出"] }];
+    const defaultVersionLogs = [{ version:"v0.3.1-beta", date:"2026-03-10", changes:["後台維護頁加入每個供應商各自的 API 測試按鈕與結果區","GPT / OpenAI 顯示名稱改為 Azure OpenAI (gpt-5.2)，並切換到公司 Azure OpenAI responses 端點","主畫面移除 API Key 欄位，API 設定集中到後台維護","新增 Outlook 問題回饋入口，會自動帶入版本、模型、模板、錯誤訊息與缺失欄位","問題回饋按鈕移到頁籤列右側並改為紅色顯示","取消主畫面共享資料夾連線步驟，回到設定後可直接使用的模式"] },{ version:"v0.3.0-beta", date:"2026-03-10", changes:["新增半共用模式：主畫面開放使用，維護頁上密碼鎖","加入共享資料夾連線與重新載入入口","專案對照表、專有名詞、進版與 API 設定改為共享檔可同步","新增 API 維護頁，集中管理 provider / base URL / model / API Key","保留個人輸入與輸出不寫回共享資料"] },{ version:"v0.2.0-beta", date:"2026-03-09", changes:["改成多頁籤工具：Summary Tool / 版本進版 / 專案對照表 / 專有名詞對應","加入多模型切換：DeepSeek / GPT(OpenAI) / Gemini","API key 改為依供應商分開暫存","加入缺欄位彈窗，允許工程師補齊或填 TBD / NA","加入專案對照表與術語表的 Dialog 編修與 CSV 匯入 / 匯出"] }];
     const defaultProjectMemory = [
       { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,WHITE", project:"Jiading" },
       { site:"IPT", customer:"Kostal", customerRole:"Tier1", oem:"NIO", product:"AUTO OPT,3394,LOWER HOUSING+PLATE,BLACK (NIO FOB)", project:"Jiading" },
@@ -371,6 +379,7 @@
       copyZhBtn: document.getElementById("copyZhBtn"),
       copyEnBtn: document.getElementById("copyEnBtn"),
       copyBothBtn: document.getElementById("copyBothBtn"),
+      feedbackBtn: document.getElementById("feedbackBtn"),
       versionLogList: document.getElementById("versionLogList"),
       projectTableBody: document.getElementById("projectTableBody"),
       glossaryTableBody: document.getElementById("glossaryTableBody"),
@@ -731,6 +740,45 @@
       renderStatusMeta(missingFields);
       if (missingFields.length) setNotice(el.missingNotice, `有必填資訊缺失：${missingFields.map((field) => field.label).join("、")}。請補齊，或填入 TBD / NA。`, "warn");
       else setNotice(el.missingNotice, "", "");
+    }
+    function collectFeedbackDiagnostics() {
+      const missingFields = computeMissingFields();
+      const errorText = el.mainNotice.classList.contains("bad") ? el.mainNotice.textContent.trim() : "";
+      return {
+        occurredAt: new Date().toLocaleString("zh-Hant-TW", { hour12:false }),
+        version: APP_VERSION,
+        provider: activeProvider().label,
+        template: getTemplateById(state.currentTemplateId).label,
+        aiConfidence: state.aiConfidence !== null ? `${(state.aiConfidence * 100).toFixed(0)}%` : "N/A",
+        errorMessage: errorText || "N/A",
+        missingFields: missingFields.length ? missingFields.map((field) => field.label).join("、") : "無"
+      };
+    }
+    function buildFeedbackMailto() {
+      const info = collectFeedbackDiagnostics();
+      const subject = `[CQE Tool Feedback] ${info.provider} / ${info.template} / ${info.version}`;
+      const body = [
+        "[CQE Tool Feedback]",
+        "",
+        "問題說明：",
+        "請描述你遇到的問題，並附上必要操作步驟、預期結果、實際結果。",
+        "",
+        "請附上截圖。",
+        "",
+        "系統自動附帶資訊：",
+        `- 發生時間：${info.occurredAt}`,
+        `- 使用版本：${info.version}`,
+        `- 模型供應商：${info.provider}`,
+        `- 模板：${info.template}`,
+        `- AI confidence：${info.aiConfidence}`,
+        `- 錯誤訊息：${info.errorMessage}`,
+        `- 缺失欄位：${info.missingFields}`
+      ].join("\n");
+      return `mailto:${encodeURIComponent(FEEDBACK_MAIL_TO)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+    function openFeedbackMail() {
+      if (!FEEDBACK_MAIL_TO.trim()) setNotice(el.mainNotice, "問題回饋收件人尚未設定，將開啟空白收件人郵件草稿。", "warn");
+      window.location.href = buildFeedbackMailto();
     }
 
     function loadProviderState() {
@@ -1124,6 +1172,7 @@
       el.copyZhBtn.addEventListener("click", () => copyText(el.zhOutput.textContent, "已複製中文 Summary。"));
       el.copyEnBtn.addEventListener("click", () => copyText(el.enOutput.textContent, "已複製 English Summary。"));
       el.copyBothBtn.addEventListener("click", () => copyText(`${el.zhOutput.textContent}\n${el.enOutput.textContent}`, "已複製中英文 Summary。"));
+      el.feedbackBtn.addEventListener("click", openFeedbackMail);
       el.openVersionDialogBtn.addEventListener("click", openVersionDialog);
       el.openProjectDialogBtn.addEventListener("click", () => openProjectDialog());
       el.openProjectCsvBtn.addEventListener("click", () => openCsvDialog("project"));
