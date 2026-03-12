@@ -3,3 +3,4 @@ node_modules
 .env
 *.db
 *.db-journal
+projects/cqe/project_cqe_qnrhelper/historical_data/
